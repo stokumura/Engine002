@@ -1,5 +1,4 @@
 #include "Shader.h"
-#include "../../Utils/FileReader/FileReader.h"
 #include "../../Utils/Logger/Logger.h"
 #include <stdexcept>
 
@@ -43,9 +42,20 @@ GLenum ShaderTypeToGL(ShaderType type) {
     }
 }
 
-Shader::Shader(const std::string &path, ShaderType type) : type(type), error(false){
-    source = FileReader::ReadFile(path);
-    Compile();
+Shader::Shader(ShaderType type) : ID(0), type(type), error(false) {
+}
+
+void Shader::AddSource(const std::string &source) {
+    if(IsValid()) {
+        LOG("WARNING::SHADER_ADD_SOURCE Shader has been already initialized, operation aborted");
+        return;
+    }
+    Compile(source);
+}
+
+
+Shader::Shader(const std::string &source, ShaderType type) : type(type), error(false){
+    Compile(source);
 }
 
 Shader::~Shader() {
@@ -53,24 +63,7 @@ Shader::~Shader() {
         glDeleteShader(ID);
 }
 
-Shader::Shader(const Shader &other) : type(other.type), source(other.source), error(false) {
-    Compile();
-}
-
-Shader& Shader::operator=(const Shader &other) {
-    if(this == &other) return *this;
-
-    if(IsValid())
-        glDeleteShader(ID);
-
-    source = other.source;
-    type = other.type;
-    Compile();
-
-    return *this;
-}
-
-Shader::Shader(Shader &&other) noexcept : ID(other.ID), type(other.type), source(std::move(other.source)), error(other.error) {
+Shader::Shader(Shader &&other) noexcept : ID(other.ID), type(other.type), error(other.error) {
     other.ID = 0;
 }
 
@@ -82,8 +75,9 @@ Shader& Shader::operator=(Shader &&other) noexcept {
 
     ID = other.ID;
     type = other.type;
-    source = std::move(other.source);
+    error = other.error;
     other.ID = 0;
+    other.error = false;
 
     return *this;
 }
@@ -95,7 +89,7 @@ void Shader::AttachShader(GLuint program, bool &success) const {
         glAttachShader(program, ID);
 }
 
-void Shader::Compile() {
+void Shader::Compile(const std::string &source) {
     const char* sourceStr = source.c_str();
     ID = glCreateShader(ShaderTypeToGL(type));
     glShaderSource(ID, 1, &sourceStr, nullptr);

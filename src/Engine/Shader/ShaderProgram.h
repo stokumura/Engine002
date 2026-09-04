@@ -5,27 +5,29 @@
 #include "UniformBlock.h"
 
 #include <vector>
-#include <unordered_map>
 
 class ShaderProgram {
     private:
         GLuint ID;
-        std::unordered_map<ShaderType, Shader> attachments;
+        std::vector<ShaderType> attachments;
         std::vector<ShaderUniformBlockBinding> uniformBlocks;
         ShaderUniforms uniforms;
 
-        bool compiled;
-        mutable bool error;
+        bool compiled = false;
+        mutable bool error = false;
 
     public:
         ShaderProgram();
         ~ShaderProgram();
 
-        void AttachShader(Shader &&shader);
+        void AttachShader(const Shader &shader);
         void Compile();
 
-        ShaderProgram(const ShaderProgram &other);
-        ShaderProgram& operator=(const ShaderProgram &other);
+        [[deprecated("WARNING::SHADER_PROGRAM_COPY_CTOR cannot be coppied")]]
+        ShaderProgram(const ShaderProgram &other) = delete;
+
+        [[deprecated("WARNING::SHADER_PROGRAM_ASSIGNMENT cannot be coppied")]]
+        ShaderProgram& operator=(const ShaderProgram &other) = delete;
         
         ShaderProgram(ShaderProgram &&other) noexcept;
         ShaderProgram& operator=(ShaderProgram &&other) noexcept;

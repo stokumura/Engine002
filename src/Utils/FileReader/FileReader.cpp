@@ -5,8 +5,7 @@
 
 std::string FileReader::ReadFile(const std::string &filePath) {
     static const std::string empty = "";
-    std::ifstream file(filePath);
-    if(!file) {
+    std::ifstream file(filePath); if(!file) {
         LOG("ERROR::FILE_READER Failed to open file: %s", filePath.c_str());
         return empty;
     }

@@ -104,12 +104,20 @@ SET(TEXTURE
     "src/Engine/Texture/Texture.cpp"
 )
 
+SET(SHADER_VARIANTS
+    "src/Engine/ShaderVariants/ShaderDefines.h"
+    "src/Engine/ShaderVariants/ShaderDefines.cpp"
+    "src/Engine/ShaderVariants/ShaderVariants.h"
+    "src/Engine/ShaderVariants/ShaderVariants.cpp"
+)
+
 SET(ENGINE
     ${SHADER}
     ${CAMERA}
     ${MESH}
     ${PRIMITIVE}
     ${TEXTURE}
+    ${SHADER_VARIANTS}
     "src/Engine/Engine.h"
 )
 

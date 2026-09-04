@@ -76,11 +76,11 @@ int main(void) {
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "test.vs";
       std::filesystem::path fragmentShaderPath = shadersPath / "test.fs";
-      Shader vertex(vertexShaderPath.string(), ShaderType::VERTEX);
-      Shader fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
+      ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
+      ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
       ShaderProgram program;
-      program.AttachShader(std::move(vertex));
-      program.AttachShader(std::move(fragment));
+      program.AttachShader(vertex.GetBaseShader());
+      program.AttachShader(fragment.GetBaseShader());
       program.Compile();
 
       CameraData cameraData;
@@ -88,8 +88,11 @@ int main(void) {
       program.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
+      globalSampler.SetMinFilter(GL_NEAREST);
+      globalSampler.SetMagFilter(GL_NEAREST);
+
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
-      std::filesystem::path imagePath = texturesPath / "brick.png";
+      std::filesystem::path imagePath = texturesPath / "box.png";
       Texture image(imagePath.string(), TextureType::DIFFUSE, 0);
 
       glEnable(GL_CULL_FACE);
@@ -100,7 +103,7 @@ int main(void) {
 
       glEnable(GL_MULTISAMPLE);
 
-      glClearColor(0.8f, 0.6f, 1.0f, 1.0f);
+      glClearColor(0.8f, 0.0f, 0.8f, 1.0f);
 
       //Uncomment for drawing as wireframe
       //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);

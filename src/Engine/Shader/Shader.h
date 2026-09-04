@@ -23,16 +23,21 @@ class Shader {
     private:
         GLuint ID;
         ShaderType type;
-        std::string source; 
 
         mutable bool error;
 
     public:
-        Shader(const std::string &path, ShaderType type);
+        Shader(ShaderType type);
+        void AddSource(const std::string &source);
+
+        Shader(const std::string &source, ShaderType type);
         ~Shader();
 
-        Shader(const Shader &other);
-        Shader& operator=(const Shader &other);
+        [[deprecated("WARNING::SHADER_COPY_CTOR cannot be coppied")]]
+        Shader(const Shader &other) = delete;
+
+        [[deprecated("WARNING::SHADER_COPY_ASSIGNMENT cannot be coppied")]]
+        Shader& operator=(const Shader &other) = delete;
 
         Shader(Shader &&other) noexcept;
         Shader& operator=(Shader &&other) noexcept;
@@ -42,7 +47,7 @@ class Shader {
         const ShaderType &GetType() const { return type; }
 
     private:
-        void Compile();
+        void Compile(const std::string &source);
         void CheckCompileErrors() const;
 
         bool IsValid() const;

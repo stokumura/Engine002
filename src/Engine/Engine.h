@@ -5,3 +5,4 @@
 #include "Primitive/Primitive.h"
 #include "Texture/Texture.h"
 #include "Texture/Sampler.h"
+#include "ShaderVariants/ShaderVariants.h"

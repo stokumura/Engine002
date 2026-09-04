@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "ShaderProgram.h"
 #include "../../Utils/Logger/Logger.h"
 #include "Shader.h"
@@ -11,61 +12,6 @@ ShaderProgram::~ShaderProgram() {
     attachments.clear();
     uniformBlocks.clear();
     glDeleteProgram(ID);
-}
-
-ShaderProgram::ShaderProgram(const ShaderProgram &other) {
-    if(!other.IsValid()) {
-        ID = 0;
-        compiled = false;
-        error = false;
-        uniforms.SetShaderProgram(0);
-        uniformBlocks.clear();
-    } else {
-        ID = glCreateProgram();
-        uniforms.SetShaderProgram(ID);
-        for(const auto &[shaderType, shader] : other.attachments) {
-            Shader copyShader = shader;
-            AttachShader(std::move(copyShader));
-        }
-        if(other.HasBeenCompiled()) {
-            Compile();
-            for(const auto &binding : other.uniformBlocks) {
-                BindUniformBlock(binding.bindingPoint, binding.uniformBlockName);
-            }
-        }
-    }
-}
-
-ShaderProgram& ShaderProgram::operator=(const ShaderProgram &other) {
-    if(this == &other) return *this;
-
-    attachments.clear();
-    glDeleteProgram(ID);
-    compiled = false;
-    error = false;
-    uniformBlocks.clear();
-
-    if(!other.IsValid()) {
-        ID = 0;
-        compiled = false;
-        error = false;
-        uniforms.SetShaderProgram(0);
-    } else {
-        ID = glCreateProgram();
-        for(const auto &[shaderType, shader] : other.attachments) {
-            Shader copyShader = shader;
-            AttachShader(std::move(copyShader));
-        }
-        if(other.HasBeenCompiled()) {
-            Compile();
-            for(const auto &binding : other.uniformBlocks) {
-                BindUniformBlock(binding.bindingPoint, binding.uniformBlockName);
-            }
-        }
-        uniforms.SetShaderProgram(ID);
-    }
-
-    return *this;
 }
 
 ShaderProgram::ShaderProgram(ShaderProgram &&other) noexcept {
@@ -121,14 +67,14 @@ ShaderProgram& ShaderProgram::operator=(ShaderProgram &&other) noexcept {
     return *this;
 }
 
-void ShaderProgram::AttachShader(Shader &&shader) {
+void ShaderProgram::AttachShader(const Shader &shader) {
     const ShaderType& shaderType = shader.GetType();
-    auto it = attachments.find(shaderType);
+    auto it = std::find(attachments.begin(), attachments.end(), shaderType);
     if(it == attachments.end()) {
         bool success;
         shader.AttachShader(ID, success);
         if(success) {
-            attachments.emplace(shaderType, std::move(shader));
+            attachments.push_back(shaderType);
         } else {
             LOG("ERROR::SHADER_PROGRAM_ATTACHMENT failed of type: %s\n Shader attachment failed, shader was not valid or had erros", ShaderTypeToString(shaderType).c_str());
         }
@@ -173,6 +119,10 @@ void ShaderProgram::BindUniformBlock(GLuint bindingPoint, const std::string &blo
     }
 #endif
     GLuint blockIndex = glGetUniformBlockIndex(ID, blockName.c_str());
+    if(blockIndex == GL_INVALID_INDEX) {
+        LOG("ERROR::SHADER_PROGRAM::BIND_UNIFORM_BLOCK block index invalid, operation aborted");
+        return;
+    }
     glUniformBlockBinding(ID, blockIndex, bindingPoint);
     uniformBlocks.push_back(ShaderUniformBlockBinding{bindingPoint, blockIndex, blockName});
 }
