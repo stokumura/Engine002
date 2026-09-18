@@ -7,7 +7,7 @@ out VS_OUT {
     vec2 TexCoords;
 } vs_out;
 
-layout(std140, binding = 0) uniform CameraData {
+layout(std140) uniform CameraData {
     mat4 view;
     mat4 projection;
     vec3 viewPosition;

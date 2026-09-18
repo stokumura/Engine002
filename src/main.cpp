@@ -6,14 +6,18 @@
 #include <assimp/Importer.hpp>
 #include <stb/stb_image.h>
 
+#include <glm/ext/matrix_transform.hpp>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 #include <filesystem>
+#include <glm/matrix.hpp>
 #include <iostream>
 
 #include "Engine/Engine.h"
+#include "Engine/Shader/Shader.h"
 #include "Utils/Utils.h"
 
 const unsigned int samples {4};
@@ -36,6 +40,9 @@ float lastCursorX{WIDTH / 2.0f};
 float lastCursorY{HEIGHT / 2.0f};
 bool firstCursorClick{true};
 bool cursorInGame{false};
+
+glm::vec3 lightColor(1.0f, 1.0f, 1.0f);
+glm::vec3 lightPosition(5.0f, 5.0f, 5.0f);
 
 int main(void) {
   if (!glfwInit()) {
@@ -67,29 +74,44 @@ int main(void) {
   }
 
   {
-      Sphere sphere(Vertex3DUnlit, 1.0f, 32, 32);
+      Sphere sphere(Vertex3DUnlit, 0.1f, 16, 16);
       Cylinder cylinder(Vertex3DUnlit, 1.0f, 2.5f, 32, 32);
-      Cube cube(Vertex3DUnlit, 2.0f, 16, 16, 16);
+      Cube cube(Vertex3DLit, 2.0f, 16, 16, 16);
+
       const Mesh &mesh = cube.GetMesh();
       const DrawInfo &draw = mesh.GetDrawInfo();
 
+      const Mesh &lightMesh = sphere.GetMesh();
+      const DrawInfo &lightDraw = mesh.GetDrawInfo();
+
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
-      std::filesystem::path vertexShaderPath = shadersPath / "test.vs";
-      std::filesystem::path fragmentShaderPath = shadersPath / "test.fs";
+      std::filesystem::path vertexShaderPath = shadersPath / "objectPhong.vert";
+      std::filesystem::path fragmentShaderPath = shadersPath / "objectPhong.frag";
+      std::filesystem::path vertexShaderLightPath = shadersPath / "objectFlatColor.vert";
+      std::filesystem::path fragmentShaderLightPath = shadersPath / "objectFlatColor.frag";
+
       ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
       ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
+      ShaderVariants vertexLight(vertexShaderLightPath.string(), ShaderType::VERTEX);
+      ShaderVariants fragmentLight(fragmentShaderLightPath.string(), ShaderType::FRAGMENT);
+
       ShaderProgram program;
-      program.AttachShader(vertex.GetBaseShader());
-      program.AttachShader(fragment.GetBaseShader());
+      program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
+      program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE" }));
       program.Compile();
+
+      ShaderProgram lightProgram;
+      lightProgram.AttachShader(vertexLight.GetBaseShader());
+      lightProgram.AttachShader(fragmentLight.GetBaseShader());
+      lightProgram.Compile();
 
       CameraData cameraData;
       UniformBlock cameraMatrices("CameraData", 0, sizeof(CameraData), &cameraData);
       program.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
-      globalSampler.SetMinFilter(GL_NEAREST);
-      globalSampler.SetMagFilter(GL_NEAREST);
+      globalSampler.SetMinFilter(GL_LINEAR);
+      globalSampler.SetMagFilter(GL_LINEAR);
 
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
       std::filesystem::path imagePath = texturesPath / "box.png";
@@ -103,7 +125,7 @@ int main(void) {
 
       glEnable(GL_MULTISAMPLE);
 
-      glClearColor(0.8f, 0.0f, 0.8f, 1.0f);
+      glClearColor(0.4f, 0.0f, 0.4f, 1.0f);
 
       //Uncomment for drawing as wireframe
       //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -119,19 +141,25 @@ int main(void) {
 
           cameraData.view = camera.GetViewMatrix();
           cameraData.projection = glm::perspective(glm::radians(camera.GetZoom()), static_cast<float>(currentWidth) / currentHeight, 0.1f, 100.0f);
+          cameraData.viewPosition = camera.GetPosition();
           cameraMatrices.UpdateData(&cameraData, sizeof(CameraData));
 
           glm::mat4 model(1.0f);
           model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
           //model = glm::scale(model, glm::vec3(1.0f + std::cos(glm::radians(currentTime * 0.5f)), 1.0f + std::sin(glm::radians(currentTime * 2.0f)), 1.0f));
           model = glm::rotate(model, glm::radians(45.0f * currentTime), glm::vec3(1.0, 1.0, 0.0));
+          glm::mat3 normal = glm::mat3(glm::transpose(glm::inverse(model)));
 
           glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-          program.Bind();
           cameraMatrices.Bind();
+
+          program.Bind();
           program.SetMat4("model", model);
-          program.SetInt("image", image.GetUnit());
+          program.SetMat3("normal", normal);
+          program.SetInt("uAlbedoMap", image.GetUnit());
+          program.SetVec3("uLightColor", lightColor);
+          program.SetVec3("uLightPosition", lightPosition);
 
           globalSampler.Bind(image.GetUnit());
           image.Bind();
@@ -140,6 +168,16 @@ int main(void) {
           glDrawElements(GL_TRIANGLES, draw.indices, GL_UNSIGNED_INT, 0);
           Mesh::Unbind();
 
+          model = glm::translate(glm::mat4(1.0), lightPosition);
+
+          lightProgram.Bind();
+          lightProgram.SetMat4("model", model);
+          lightProgram.SetVec3("uAlbedoFlatColor", lightColor);
+          lightProgram.SetVec3("uLightColor", lightColor);
+
+          lightMesh.Bind();
+          glDrawElements(GL_TRIANGLES, lightDraw.indices, GL_UNSIGNED_INT, 0);
+          lightMesh.Unbind();
 
           glfwSwapBuffers(window);
 

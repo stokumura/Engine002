@@ -4,7 +4,6 @@
 /.cache
 .gdb_history
 .clang-format
-/resources
-!/resources/shaders
+/resources/textures
 /includes/glm
 /includes/assimp

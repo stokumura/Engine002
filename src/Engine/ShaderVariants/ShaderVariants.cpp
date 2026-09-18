@@ -76,6 +76,7 @@ std::string ShaderVariants::InjectDefines(const std::string &source, const std::
     std::string variantSource = source.substr(0, versionEnd + 1);
     for(const std::string &define : defines)
         variantSource += "#define " + define + "\n";
+    variantSource += source.substr(versionEnd + 1);
     return variantSource;
 }
 
