@@ -15,7 +15,7 @@ uniform vec3 uLightColor;
 uniform vec3 uLightPosition;
 
 void main() {
-#ifdef USE_ALBEDO_TEXTURE
+#ifdef USE_ALBEDO_TEXTURE_MAP
     vec3 albedoColor = texture(uAlbedoMap, fs_in.TexCoords).rgb;
 #else
     vec3 albedoColor = uAlbedoFlatColor;
@@ -31,7 +31,7 @@ void main() {
     vec3 normalDirection = normalize(fs_in.Normal);
     vec3 lightDirection = normalize(uLightPosition - fs_in.FragPos);
 
-#ifndef DISABLE_AMBIENT
+#ifndef DISABLE_DIFFUSE
     vec3 diffuse = max(dot(normalDirection, lightDirection), 0.0) * uLightColor;
 #else
     vec3 diffuse = vec3(0.0);

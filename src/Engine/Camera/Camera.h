@@ -70,6 +70,7 @@ class Camera {
 
         float GetZoom() const { return zoom; }
         glm::vec3 GetPosition() const { return position; }
+        glm::vec3 GetFront() const { return front; }
 
     private:
         void NormalizeCameraVectors();

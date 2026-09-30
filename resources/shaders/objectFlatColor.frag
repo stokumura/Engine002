@@ -12,7 +12,7 @@ uniform sampler2D uAlbedoMap;
 uniform vec3 uLightColor;
 
 void main() {
-#ifdef USE_ALBEDO_TEXTURE
+#ifdef USE_ALBEDO_TEXTURE_MAP
     vec3 albedoColor = texture(uAlbedoMap, fs_in.TexCoords).rgb;
 #else
     vec3 albedoColor = uAlbedoFlatColor;
