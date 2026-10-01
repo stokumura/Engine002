@@ -21,13 +21,13 @@ struct Material {
     float shininess;
     vec3 ambient;
 #ifdef USE_ALBEDO_TEXTURE_MAP
-    sampler2D diffuse;
+    sampler2D diffuse1;
 #else
     vec3 diffuse;
 #endif
 
 #ifdef USE_SPECULAR_TEXTURE_MAP
-    sampler2D specular;
+    sampler2D specular1;
 #else
     vec3 specular;
 #endif
@@ -93,13 +93,13 @@ void main() {
     object.ambient = uObjectMaterial.ambient;
 
 #ifdef USE_ALBEDO_TEXTURE_MAP
-    object.diffuse = texture(uObjectMaterial.diffuse, fs_in.TexCoords).rgb; 
+    object.diffuse = texture(uObjectMaterial.diffuse1, fs_in.TexCoords).rgb; 
 #else
     object.diffuse = uObjectMaterial.diffuse;
 #endif
 
 #ifdef USE_SPECULAR_TEXTURE_MAP
-    object.specular = texture(uObjectMaterial.specular, fs_in.TexCoords).rgb; 
+    object.specular = texture(uObjectMaterial.specular1, fs_in.TexCoords).rgb; 
 #else
     object.specular = uObjectMaterial.specular;
 #endif

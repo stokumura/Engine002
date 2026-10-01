@@ -17,8 +17,10 @@
 #include <iostream>
 
 #include "Engine/Engine.h"
+#include "Engine/Mesh/VertexAttribute.h"
 #include "Engine/Shader/Shader.h"
 #include "Engine/Texture/Texture.h"
+#include "Utils/ExecutablePath/ExecutablePath.h"
 #include "Utils/Utils.h"
 
 const unsigned int samples {4};
@@ -106,10 +108,12 @@ int main(void) {
       Cube cube(Vertex3DLit, 1.0f, 16, 16, 16);
 
       const Mesh &mesh = cube.GetMesh();
-      const DrawInfo &draw = mesh.GetDrawInfo();
 
       const Mesh &lightMesh = sphere.GetMesh();
-      const DrawInfo &lightDraw = mesh.GetDrawInfo();
+
+      std::filesystem::path modelsPath = GetResourcesPath() / "objects";
+      std::filesystem::path backpackPath = modelsPath / "backpack" / "backpack.obj";
+      Model modelTest(Vertex3DUnlit, backpackPath);
 
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
@@ -140,11 +144,11 @@ int main(void) {
       globalSampler.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
       globalSampler.SetMagFilter(GL_LINEAR);
 
-      std::filesystem::path texturesPath = GetResourcesPath() / "textures";
-      std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
-      std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
-      Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
-      Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
+      //std::filesystem::path texturesPath = GetResourcesPath() / "textures";
+      //std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
+      //std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
+      //Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
+      //Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
 
       glEnable(GL_CULL_FACE);
       glCullFace(GL_BACK);
@@ -181,10 +185,15 @@ int main(void) {
 
           program.SetFloat("uObjectMaterial.shininess", shininess);
           program.SetVec3("uObjectMaterial.ambient", glm::vec3(0.2, 0.2, 0.2));
-          program.SetInt("uObjectMaterial.diffuse", albedoTexture.GetUnit());
-          program.SetInt("uObjectMaterial.specular", specularTexture.GetUnit());
+          //program.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
+          //program.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
 
-          program.SetInt("uNumDirLights", 0);
+          program.SetInt("uNumDirLights", 1);
+          program.SetVec3("uDirLights[0].direction", lightDirection);
+          program.SetVec3("uDirLights[0].ambient", lightColorAmbient);
+          program.SetVec3("uDirLights[0].diffuse", lightColorDiffuse);
+          program.SetVec3("uDirLights[0].specular", lightColorSpecular);
+
           program.SetInt("uNumPointLights", 1);
           program.SetVec3("uPointLights[0].ambient", lightColorAmbient);
           program.SetVec3("uPointLights[0].diffuse", lightColorDiffuse);
@@ -207,16 +216,18 @@ int main(void) {
           program.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
 
 
-          globalSampler.Bind(albedoTexture.GetUnit());
-          albedoTexture.Bind();
+          //globalSampler.Bind(albedoTexture.GetUnit());
+          //albedoTexture.Bind();
 
-          globalSampler.Bind(specularTexture.GetUnit());
-          specularTexture.Bind();
+          //globalSampler.Bind(specularTexture.GetUnit());
+          //specularTexture.Bind();
 
           glm::mat4 model(1.0f);
           glm::mat3 normal(1.0);
+        
+          for(int i = 0; i < 1; i++) {
+              program.Bind();
 
-          for(int i = 0; i < 10; i++) {
               model = glm::translate(glm::mat4(1.0), cubePositions[i]);
               //model = glm::scale(model, glm::vec3(1.0f + std::cos(glm::radians(currentTime * 0.5f)), 1.0f + std::sin(glm::radians(currentTime * 2.0f)), 1.0f));
               model = glm::rotate(model, glm::radians(45.0f * currentTime), glm::vec3(1.0, 1.0, 0.0));
@@ -225,10 +236,11 @@ int main(void) {
               program.SetMat4("model", model);
               program.SetMat3("normal", normal);
 
-              mesh.Bind();
-              glDrawElements(GL_TRIANGLES, draw.indices, GL_UNSIGNED_INT, 0);
+              //mesh.Draw(program);
+              modelTest.Draw(program, globalSampler);
           }
-          Mesh::Unbind();
+
+
 
           model = glm::translate(glm::mat4(1.0), lightPosition);
 
@@ -238,7 +250,7 @@ int main(void) {
           lightProgram.SetVec3("uLightColor", glm::vec3(1.0,1.0,1.0));
 
           lightMesh.Bind();
-          glDrawElements(GL_TRIANGLES, lightDraw.indices, GL_UNSIGNED_INT, 0);
+          lightMesh.Draw(lightProgram, globalSampler);
           lightMesh.Unbind();
 
           glfwSwapBuffers(window);

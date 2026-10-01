@@ -20,7 +20,6 @@ const VertexAttributeTypeLayout Vertex3DLitFull { VertexAttributeType::POSITION3
 
 struct VertexAttributeLayout {
     unsigned int components;
-    unsigned int divisor;
 };
 
 using VertexLayout = std::vector<VertexAttributeLayout>;

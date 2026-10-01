@@ -76,5 +76,5 @@ Mesh Cylinder::ConstructMesh(const VertexAttributeTypeLayout &attributes) const 
         indices.push_back(current + 1);
     }
 
-    return Mesh(layout, vertices, indices);
+    return Mesh(layout, vertices, indices, std::vector<const Texture*>());
 }

@@ -4,7 +4,7 @@ VertexLayout VertexAttribute::GetVertexLayout(const VertexAttributeTypeLayout &a
     VertexLayout layout(attributes.size());
     for(int i = 0; i < layout.size(); i++) {
         unsigned int components {GetComponentsOfAttributeType(attributes[i])};
-        layout[i] = VertexAttributeLayout {components , 0};
+        layout[i] = VertexAttributeLayout { components };
     }
     return layout;
 }

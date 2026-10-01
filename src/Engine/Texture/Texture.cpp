@@ -24,7 +24,7 @@ std::string TextureTypeToString(TextureType type) {
     }
 }
 
-Texture::Texture(const std::string &path, TextureType type, GLuint unit) : type(type) {
+Texture::Texture(const std::string &path, TextureType type, GLuint unit) : path(path), type(type) {
     SetUnit(unit);
     stbi_set_flip_vertically_on_load(true);
     int channels;
@@ -89,7 +89,8 @@ Texture::~Texture() {
     if(ID) glDeleteTextures(1, &ID);
 }
 
-Texture::Texture(Texture &&other) noexcept : ID(other.ID), width(other.width), height(other.height), type(other.type), unit(other.unit), binded(other.binded) {
+Texture::Texture(Texture &&other) noexcept : ID(other.ID), width(other.width), height(other.height), path(other.path), type(other.type), unit(other.unit), binded(other.binded) {
+    other.path = "";
     other.ID = 0;
     other.binded = false;
 }
@@ -102,12 +103,14 @@ Texture& Texture::operator=(Texture &&other) noexcept {
     ID = other.ID;
     width = other.width;
     height = other.height;
+    path = other.path;
     type = other.type;
     unit = other.unit;
     binded = other.binded;
 
     other.ID = 0;
     other.binded = false;
+    other.path = "";
 
     return *this;
 }

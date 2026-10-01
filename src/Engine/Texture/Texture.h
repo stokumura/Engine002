@@ -23,6 +23,7 @@ class Texture {
         TextureType type;
         GLuint unit;
         int width, height;
+        std::string path;
 
         mutable bool binded = false;
 
@@ -45,7 +46,9 @@ class Texture {
         void Unbind() const;
         void SetUnit(GLuint newUnit);
 
+        TextureType GetType() const { return type; }
         GLuint GetUnit() const { return unit; }
         int GetWidth() const { return width; }
         int GetHeight() const { return height; }
+        std::string GetPath() const { return path; }
 };

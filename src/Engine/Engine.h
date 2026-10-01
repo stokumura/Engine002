@@ -6,3 +6,4 @@
 #include "Texture/Texture.h"
 #include "Texture/Sampler.h"
 #include "ShaderVariants/ShaderVariants.h"
+#include "Model/Model.h"

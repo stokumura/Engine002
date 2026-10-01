@@ -111,6 +111,11 @@ SET(SHADER_VARIANTS
     "src/Engine/ShaderVariants/ShaderVariants.cpp"
 )
 
+SET(MODEL
+    "src/Engine/Model/Model.h"
+    "src/Engine/Model/Model.cpp"
+)
+
 SET(ENGINE
     ${SHADER}
     ${CAMERA}
@@ -118,6 +123,7 @@ SET(ENGINE
     ${PRIMITIVE}
     ${TEXTURE}
     ${SHADER_VARIANTS}
+    ${MODEL}
     "src/Engine/Engine.h"
 )
 

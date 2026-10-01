@@ -4,25 +4,23 @@
 
 #include "VertexAttribute.h"
 
-struct DrawInfo {
-    unsigned int indices;
-    unsigned int instances;
-};
+#include "../Texture/Texture.h"
+#include "../Texture/Sampler.h"
+#include "../Shader/ShaderProgram.h"
 
 class Mesh {
     private:
         VertexLayout layout;
         std::vector<float> vertices;
         std::vector<unsigned int> indices;
+        std::vector<const Texture*> textures;
 
         GLuint VAO, VBO, EBO;
         unsigned int instances;
 
-        DrawInfo draw;
-
     public:
         Mesh();
-        Mesh(const VertexLayout &layout, const std::vector<float> &vertices, const std::vector<unsigned int> &indices, unsigned int instances = 0);
+        Mesh(const VertexLayout &layout, const std::vector<float> &vertices, const std::vector<unsigned int> &indices, const std::vector<const Texture*> &textures, unsigned int instances = 0);
         ~Mesh();
 
         Mesh(const Mesh& other);
@@ -34,7 +32,7 @@ class Mesh {
         void Bind() const;
         static void Unbind();
 
-        const DrawInfo &GetDrawInfo() const { return draw; }
+        void Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const;
 
     private:
         bool CreateBuffers(const Mesh *source);

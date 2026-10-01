@@ -73,5 +73,5 @@ Mesh Sphere::ConstructMesh(const VertexAttributeTypeLayout &attributes) const {
         }
     }
 
-    return Mesh(layout, vertices, indices);
+    return Mesh(layout, vertices, indices, std::vector<const Texture*>());
 }

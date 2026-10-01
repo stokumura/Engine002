@@ -59,5 +59,5 @@ Mesh Cube::ConstructMesh(const VertexAttributeTypeLayout &attributes) const {
     AddFace(glm::vec3(-half, -half, half), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), xSubdivisions, ySubdivisions); //+Z
     AddFace(glm::vec3(half, -half, -half), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), xSubdivisions, ySubdivisions); //-Z
 
-    return Mesh(layout, vertices, indices);
+    return Mesh(layout, vertices, indices, std::vector<const Texture*>());
 }
