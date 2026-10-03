@@ -23,10 +23,12 @@ void main() {
     vs_out.TexCoords = aTexCoords;
     vs_out.FragPos = vec3(model * vec4(aPos, 1.0));
 
-#ifdef USE_NORMAL_MATRIX
-    vs_out.Normal = normal * aNormal;
-#else
-    vs_out.Normal = mat3(transpose(inverse(model))) * aNormal; 
+#ifndef USE_NORMAL_TEXTURE_MAP
+    #ifdef USE_NORMAL_MATRIX
+        vs_out.Normal = normal * aNormal;
+    #else
+        vs_out.Normal = mat3(transpose(inverse(model))) * aNormal; 
+    #endif
 #endif
 
     vs_out.ViewPosition = viewPosition;

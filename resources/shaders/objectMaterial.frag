@@ -31,6 +31,10 @@ struct Material {
 #else
     vec3 specular;
 #endif
+
+#ifdef USE_NORMAL_TEXTURE_MAP
+    sampler2D normal1;
+#endif
 };
 
 struct DirectionalLight {
@@ -72,6 +76,7 @@ struct Object {
     vec3 ambient;
     vec3 diffuse;
     vec3 specular;
+    vec3 normal;
 };
 
 uniform Material uObjectMaterial;
@@ -99,9 +104,19 @@ void main() {
 #endif
 
 #ifdef USE_SPECULAR_TEXTURE_MAP
-    object.specular = texture(uObjectMaterial.specular1, fs_in.TexCoords).rgb; 
+    #ifdef SPECULAR_IS_GRAY
+        object.specular = texture(uObjectMaterial.specular1, fs_in.TexCoords).rrr; 
+    #else
+        object.specular = texture(uObjectMaterial.specular1, fs_in.TexCoords).rgb; 
+    #endif
 #else
     object.specular = uObjectMaterial.specular;
+#endif
+
+#ifdef USE_NORMAL_TEXTURE_MAP
+    object.normal = normalize(texture(uObjectMaterial.normal1, fs_in.TexCoords).rgb * 2.0 - 1.0);
+#else
+    object.normal = normalize(fs_in.Normal);
 #endif
 
 #ifdef USE_ALBEDO_AS_AMBIENT
@@ -128,7 +143,7 @@ vec4 GetPointLight (PointLight light, Object object) {
     vec3 ambient = vec3(0.0);
 #endif
 
-    vec3 normalDirection = normalize(fs_in.Normal);
+    vec3 normalDirection = object.normal;
     vec3 lightDirection = normalize(light.position - fs_in.FragPos);
     float distance = length(light.position - fs_in.FragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));
@@ -160,7 +175,7 @@ vec4 GetDirectionalLight (DirectionalLight light, Object object) {
     vec3 ambient = vec3(0.0);
 #endif
 
-    vec3 normalDirection = normalize(fs_in.Normal);
+    vec3 normalDirection = object.normal;
     vec3 lightDirection = normalize(-light.direction);
 
 #ifndef DISABLE_DIFFUSE
@@ -189,7 +204,7 @@ vec4 GetSpotLight(SpotLight light, Object object) {
     vec3 ambient = vec3(0.0);
 #endif
 
-    vec3 normalDirection = normalize(fs_in.Normal);
+    vec3 normalDirection = object.normal;
     vec3 lightDirection = normalize(light.position - fs_in.FragPos);
     float distance = length(light.position - fs_in.FragPos);
     float attenuation = 1.0 / (light.constant + light.linear * distance + light.quadratic * (distance * distance));

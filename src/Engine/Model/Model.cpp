@@ -133,8 +133,8 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
     std::vector<const Texture*> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, TextureType::SPECULAR);
     textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
 
-    //std::vector<const Texture*> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, TextureType::NORMAL);
-    //textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
+    std::vector<const Texture*> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, TextureType::NORMAL);
+    textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
 
     std::vector<const Texture*> heightMaps = loadMaterialTextures(material, aiTextureType_AMBIENT, TextureType::HEIGHT);
     textures.insert(textures.end(), heightMaps.begin(), heightMaps.end());

@@ -45,9 +45,9 @@ bool firstCursorClick{true};
 bool cursorInGame{false};
 
 glm::vec3 lightColorAmbient(0.05f, 0.05f, 0.05f);
-glm::vec3 lightColorDiffuse(1.0f, 1.0f, 1.0f);
-glm::vec3 lightColorSpecular(1.0f, 1.0f, 1.0f);
-glm::vec3 lightPosition(2.5f, 2.5f, 2.5f);
+glm::vec3 lightColorDiffuse(0.8f, 0.8f, 0.8f);
+glm::vec3 lightColorSpecular(0.5f, 0.5f, 0.5f);
+glm::vec3 lightPosition(5.0f, 5.0f, 5.0f);
 glm::vec3 lightDirection(-0.2f, -0.1f, -0.3f);
 
 float shininess = 0.6f;
@@ -113,7 +113,7 @@ int main(void) {
 
       std::filesystem::path modelsPath = GetResourcesPath() / "objects";
       std::filesystem::path backpackPath = modelsPath / "backpack" / "backpack.obj";
-      Model modelTest(Vertex3DUnlit, backpackPath);
+      Model modelTest(Vertex3DLit, backpackPath);
 
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
@@ -127,8 +127,8 @@ int main(void) {
       ShaderVariants fragmentLight(fragmentShaderLightPath.string(), ShaderType::FRAGMENT);
 
       ShaderProgram program;
-      program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
-      program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
+      program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX", "USE_NORMAL_TEXTURE_MAP" }));
+      program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT", "USE_NORMAL_TEXTURE_MAP", "SPECULAR_IS_GRAY" }));
       program.Compile();
 
       ShaderProgram lightProgram;
@@ -190,9 +190,9 @@ int main(void) {
 
           program.SetInt("uNumDirLights", 1);
           program.SetVec3("uDirLights[0].direction", lightDirection);
-          program.SetVec3("uDirLights[0].ambient", lightColorAmbient);
-          program.SetVec3("uDirLights[0].diffuse", lightColorDiffuse);
-          program.SetVec3("uDirLights[0].specular", lightColorSpecular);
+          program.SetVec3("uDirLights[0].ambient", lightColorAmbient * .25f);
+          program.SetVec3("uDirLights[0].diffuse", lightColorDiffuse * .25f);
+          program.SetVec3("uDirLights[0].specular", lightColorSpecular * .25f);
 
           program.SetInt("uNumPointLights", 1);
           program.SetVec3("uPointLights[0].ambient", lightColorAmbient);
@@ -234,7 +234,7 @@ int main(void) {
               normal = glm::mat3(glm::transpose(glm::inverse(model)));
 
               program.SetMat4("model", model);
-              program.SetMat3("normal", normal);
+              //program.SetMat3("normal", normal);
 
               //mesh.Draw(program);
               modelTest.Draw(program, globalSampler);
