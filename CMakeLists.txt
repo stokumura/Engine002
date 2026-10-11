@@ -95,6 +95,8 @@ SET(PRIMITIVE
     "src/Engine/Primitive/Cylinder.cpp"
     "src/Engine/Primitive/Cube.h"
     "src/Engine/Primitive/Cube.cpp"
+    "src/Engine/Primitive/Billboard.h"
+    "src/Engine/Primitive/Billboard.cpp"
 )
 
 SET(TEXTURE
@@ -116,6 +118,11 @@ SET(MODEL
     "src/Engine/Model/Model.cpp"
 )
 
+SET(BILLBOARD_GRASS
+    "src/Engine/BillboardGrass/BillboardGrass.h"
+    "src/Engine/BillboardGrass/BillboardGrass.cpp"
+)
+
 SET(ENGINE
     ${SHADER}
     ${CAMERA}
@@ -124,6 +131,7 @@ SET(ENGINE
     ${TEXTURE}
     ${SHADER_VARIANTS}
     ${MODEL}
+    ${BILLBOARD_GRASS}
     "src/Engine/Engine.h"
 )
 

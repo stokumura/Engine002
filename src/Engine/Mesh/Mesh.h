@@ -34,6 +34,8 @@ class Mesh {
 
         void Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const;
 
+        GLuint GetVAO() const { return VAO; }
+
     private:
         bool CreateBuffers(const Mesh *source);
         void SetupVertexArrayLayout();

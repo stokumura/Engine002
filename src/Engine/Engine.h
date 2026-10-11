@@ -7,3 +7,4 @@
 #include "Texture/Sampler.h"
 #include "ShaderVariants/ShaderVariants.h"
 #include "Model/Model.h"
+#include "BillboardGrass/BillboardGrass.h"
