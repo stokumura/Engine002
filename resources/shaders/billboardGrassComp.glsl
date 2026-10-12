@@ -1,8 +1,14 @@
 #version 460 core
 layout (local_size_x = 8, local_size_y = 8) in;
 
+struct SingleLeafData {
+    float height;
+    vec2 direction;
+    vec3 position;
+};
+
 layout(std430, binding = 0) writeonly buffer Instances {
-    vec4 instances[];
+    SingleLeafData instances[];
 };
 
 layout(std430, binding = 1) buffer Indirect {
@@ -116,6 +122,11 @@ void main() {
     if(distance(position, viewPosition) > uMaxDist) return;
     if(!inFrustum(position, height)) return;
 
+    SingleLeafData data;
+    data.height = height;
+    data.direction = normalize(randomOffset.xz);
+    data.position = position;
+
     uint idx = atomicAdd(instanceCount, 1u);
-    instances[idx] = vec4(position, height);
+    instances[idx] = data;
 }

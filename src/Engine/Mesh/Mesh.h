@@ -36,6 +36,8 @@ class Mesh {
 
         GLuint GetVAO() const { return VAO; }
 
+        unsigned int GetIndexCount() const { return indices.size(); }
+
     private:
         bool CreateBuffers(const Mesh *source);
         void SetupVertexArrayLayout();

@@ -123,6 +123,11 @@ SET(BILLBOARD_GRASS
     "src/Engine/BillboardGrass/BillboardGrass.cpp"
 )
 
+SET(MODERN_GRASS
+    "src/Engine/ModernGrass/ModernGrass.h"
+    "src/Engine/ModernGrass/ModernGrass.cpp"
+)
+
 SET(ENGINE
     ${SHADER}
     ${CAMERA}
@@ -132,6 +137,7 @@ SET(ENGINE
     ${SHADER_VARIANTS}
     ${MODEL}
     ${BILLBOARD_GRASS}
+    ${MODERN_GRASS}
     "src/Engine/Engine.h"
 )
 

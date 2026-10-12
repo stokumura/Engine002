@@ -16,12 +16,7 @@
 #include <glm/matrix.hpp>
 #include <iostream>
 
-#include "Engine/BillboardGrass/BillboardGrass.h"
 #include "Engine/Engine.h"
-#include "Engine/Mesh/VertexAttribute.h"
-#include "Engine/Shader/Shader.h"
-#include "Engine/Texture/Texture.h"
-#include "Utils/ExecutablePath/ExecutablePath.h"
 #include "Utils/Utils.h"
 
 const unsigned int samples {4};
@@ -81,6 +76,7 @@ int main(void) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SAMPLES, samples);
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE); // antes de glfwCreateWindow
 
   GLFWwindow* window = glfwCreateWindow(currentWidth, currentHeight, "Hello World", nullptr, nullptr);
   if (!window) {
@@ -114,14 +110,17 @@ int main(void) {
       //std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
       //Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
       //Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
-      std::filesystem::path grassTexturePath = texturesPath / "grass.png";
-      Texture grassAlbedo(grassTexturePath.string(), TextureType::DIFFUSE, 0);
+      //std::filesystem::path grassTexturePath = texturesPath / "grass.png";
+      //Texture grassAlbedo(grassTexturePath.string(), TextureType::DIFFUSE, 0);
 
-      const BillboardGrass grass(grassAlbedo);
 
       std::filesystem::path modelsPath = GetResourcesPath() / "objects";
       std::filesystem::path backpackPath = modelsPath / "backpack" / "backpack.obj";
+      std::filesystem::path grassPath = modelsPath / "grass" / "grass.fbx";
       Model modelTest(Vertex3DLit, backpackPath);
+      Model grassModel(Vertex3DLit, grassPath);
+
+      const ModernGrass grass(grassModel);
 
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
@@ -182,8 +181,8 @@ int main(void) {
 
       glEnable(GL_MULTISAMPLE);
 
-      glEnable(GL_BLEND);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      //glEnable(GL_BLEND);
+      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
       glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
@@ -281,16 +280,19 @@ int main(void) {
 
           grassComputeProgram.Bind();
           grassComputeProgram.SetVec3("uOrigin", glm::vec3(0.0, -1.0, 0.0));
-          grassComputeProgram.SetFloat("uSpacing", 0.25f);
-          grassComputeProgram.SetFloat("uHeight", 1.0f);
+          grassComputeProgram.SetFloat("uSpacing", 0.15f);
+          grassComputeProgram.SetFloat("uHeight", 2.0f);
           grassComputeProgram.SetFloat("uMaxDist", 100.0f);
 
-          glDisable(GL_CULL_FACE);
           grassProgram.Bind();
-          grassProgram.SetVec3("uCamRight", camera.GetRight());
+          grassProgram.SetVec3("uDirLight.direction", lightDirection);
+          grassProgram.SetVec3("uDirLight.ambient", lightColorAmbient);
+          grassProgram.SetVec3("uDirLight.diffuse", lightColorDiffuse);
+          grassProgram.SetVec3("uDirLight.specular", lightColorSpecular);
+          grassProgram.SetFloat("uSpecular", 0.85f);
+          grassProgram.SetFloat("uShininess", shininess);
           grassProgram.SetFloat("uTime", currentTime);
-          grass.Draw(grassProgram, grassComputeProgram, globalSampler);
-          glEnable(GL_CULL_FACE);
+          grass.Draw(grassProgram, grassComputeProgram);
 
           glfwSwapBuffers(window);
 

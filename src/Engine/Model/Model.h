@@ -21,6 +21,8 @@ class Model {
         Model(const VertexAttributeTypeLayout &attributes, const std::filesystem::path &path);
         void Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const;
 
+        const Mesh &GetMesh(int index) const { return meshes[index]; };
+
     private:
         void loadModel(const std::filesystem::path &path);
         void processNode(aiNode *node, const aiScene *scene);

@@ -3,8 +3,14 @@ layout (location = 0) in vec3 aPos;
 layout (location = 1) in vec2 aTexCoords;
 layout (location = 2) in vec3 aNormal;
 
+struct SingleLeafData {
+    float height;
+    vec2 direction;
+    vec3 position;
+};
+
 layout(std430, binding = 0) readonly buffer Instances {
-    vec4 instances[];
+    SingleLeafData instances[];
 };
 
 out VS_OUT {
@@ -24,21 +30,23 @@ uniform vec3 uCamRight;
 uniform float uTime;
 
 void main() {
-    vec4 instance = instances[gl_InstanceID];
-    vec3 basePos = instance.xyz;
-    float height = instance.w;
+    SingleLeafData instance = instances[gl_InstanceID];
+    vec3 basePos = instance.position;
+    float height = instance.height;
+    vec3 pos = aPos.yxz / 10.0;
+    pos.y *= -1;
 
-    vec3 right = normalize(vec3(uCamRight.x, 0.0, uCamRight.z));
-    vec3 worldPos = basePos + right * aPos.x + vec3(0.0, aPos.y * height, 0.0);
+    vec3 forward = normalize(vec3(instance.direction.x, 0.0, instance.direction.y));
+    vec3 up = vec3(0.0, 1.0, 0.0);
+    vec3 right = cross(up, forward);
 
-    float sway = sin(uTime * 2.0 + basePos.x * 0.5 + basePos.z * 0.3) * 0.15;
-    worldPos.x += sway * aPos.y * aPos.y;
+    vec3 worldPos = basePos + right * pos.x + vec3(0.0, pos.y * height, 0.0);
+
+    float sway = sin(uTime * 2.0 + basePos.x * 0.5 + basePos.z * 0.3) * 0.2;
+    worldPos.x += sway * pos.y * pos.y;
 
     vs_out.TexCoords = aTexCoords;
     vs_out.FragPos = worldPos;
-
-    vec3 up = vec3(0.0, 1.0, 0.0);
-    vec3 forward = cross(right, up);
 
     vs_out.Normal = normalize(right * aNormal.x + up * aNormal.y / height + forward * aNormal.z); 
 

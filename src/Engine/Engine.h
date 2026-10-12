@@ -8,3 +8,4 @@
 #include "ShaderVariants/ShaderVariants.h"
 #include "Model/Model.h"
 #include "BillboardGrass/BillboardGrass.h"
+#include "ModernGrass/ModernGrass.h"

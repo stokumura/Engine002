@@ -10,7 +10,7 @@ struct DrawElementsIndirectCommand { GLuint count, instanceCount, firstIndex, ba
 
 class BillboardGrass {
     private:
-        const int GX = 64, GY = 64;
+        const int GX = 32, GY = 32;
 
         GLuint SSBO, IndirectBuf, VAO;
 
