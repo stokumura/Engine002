@@ -97,6 +97,8 @@ SET(PRIMITIVE
     "src/Engine/Primitive/Cube.cpp"
     "src/Engine/Primitive/Billboard.h"
     "src/Engine/Primitive/Billboard.cpp"
+    "src/Engine/Primitive/Quad.h"
+    "src/Engine/Primitive/Quad.cpp"
 )
 
 SET(TEXTURE
@@ -128,6 +130,11 @@ SET(MODERN_GRASS
     "src/Engine/ModernGrass/ModernGrass.cpp"
 )
 
+SET(RENDER_TEXTURE
+    "src/Engine/RenderTexture/RenderTexture.h"
+    "src/Engine/RenderTexture/RenderTexture.cpp"
+)
+
 SET(ENGINE
     ${SHADER}
     ${CAMERA}
@@ -138,6 +145,7 @@ SET(ENGINE
     ${MODEL}
     ${BILLBOARD_GRASS}
     ${MODERN_GRASS}
+    ${RENDER_TEXTURE}
     "src/Engine/Engine.h"
 )
 

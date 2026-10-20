@@ -6,6 +6,7 @@
 #include <assimp/Importer.hpp>
 #include <stb/stb_image.h>
 
+#include <cstdio>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
@@ -14,9 +15,14 @@
 
 #include <filesystem>
 #include <glm/matrix.hpp>
+#include <glm/trigonometric.hpp>
 #include <iostream>
 
 #include "Engine/Engine.h"
+#include "Engine/Mesh/VertexAttribute.h"
+#include "Engine/RenderTexture/RenderTexture.h"
+#include "Engine/Shader/Shader.h"
+#include "Engine/ShaderVariants/ShaderVariants.h"
 #include "Utils/Utils.h"
 
 const unsigned int samples {4};
@@ -29,6 +35,10 @@ void FramebufferSizeCallback(GLFWwindow* window, int width, int height);
 void CursorCallback(GLFWwindow* window, double xposIn, double yposIn);
 void ScrollCallback(GLFWwindow* window, double xoffset, double yoffset);
 void ProcessInput(GLFWwindow* window);
+void GLAPIENTRY glDebugCallback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar *message, const void *userParam) {
+    if(severity == GL_DEBUG_SEVERITY_NOTIFICATION) return;
+    fprintf(stderr, "[GL %s] type=0x%x id=%u severity=0x%x: %s\n", type == GL_DEBUG_TYPE_ERROR ? "ERROR" : "DEBUG", type, id, severity, message);
+}
 
 Camera camera;
 
@@ -43,7 +53,7 @@ bool cursorInGame{false};
 glm::vec3 lightColorAmbient(0.05f, 0.05f, 0.05f);
 glm::vec3 lightColorDiffuse(0.8f, 0.8f, 0.8f);
 glm::vec3 lightColorSpecular(0.5f, 0.5f, 0.5f);
-glm::vec3 lightPosition(5.0f, 5.0f, 5.0f);
+glm::vec3 lightPosition(2.0f, 3.0f, -3.0f);
 glm::vec3 lightDirection(-0.2f, -0.1f, -0.3f);
 
 float shininess = 32.0f;
@@ -53,18 +63,7 @@ float quadraticAttenuation = 0.032f;
 float cutOff = glm::cos(glm::radians(12.5f));
 float outerCutOff = glm::cos(glm::radians(17.5f));
 
-glm::vec3 cubePositions[] = {
-    glm::vec3(0.0f, 0.0f, 0.0f),
-    glm::vec3( 2.0f,  5.0f, -15.0f),
-    glm::vec3(-1.5f, -2.2f, -2.5f),
-    glm::vec3(-3.8f, -2.0f, -12.3f),
-    glm::vec3( 2.4f, -0.4f, -3.5f),
-    glm::vec3(-1.7f,  3.0f, -7.5f),
-    glm::vec3( 1.3f, -2.0f, -2.5f),
-    glm::vec3( 1.5f,  2.0f, -2.5f),
-    glm::vec3( 1.5f,  0.2f, -1.5f),
-    glm::vec3(-1.3f,  1.0f, -1.5f),
-};
+RenderTexture render;
 
 int main(void) {
   if (!glfwInit()) {
@@ -76,7 +75,9 @@ int main(void) {
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_SAMPLES, samples);
-  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE); // antes de glfwCreateWindow
+#if defined(DEBUG)
+  glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
 
   GLFWwindow* window = glfwCreateWindow(currentWidth, currentHeight, "Hello World", nullptr, nullptr);
   if (!window) {
@@ -96,75 +97,69 @@ int main(void) {
     return -1;
   }
 
+  GLint flags;
+  glGetIntegerv(GL_CONTEXT_FLAGS, &flags);
+  if(flags & GL_CONTEXT_FLAG_DEBUG_BIT) {
+      glEnable(GL_DEBUG_OUTPUT);
+      glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+      glDebugMessageCallback(glDebugCallback, nullptr);
+      glDebugMessageControl(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, GL_TRUE);
+  }
+
   {
+      render = RenderTexture(currentWidth, currentHeight);
+
       Sphere sphere(Vertex3DUnlit, 0.1f, 16, 16);
-      Cylinder cylinder(Vertex3DUnlit, 1.0f, 2.5f, 32, 32);
       Cube cube(Vertex3DLit, 1.0f, 16, 16, 16);
+      Quad quad(Vertex2D);
 
       const Mesh &mesh = cube.GetMesh();
-
       const Mesh &lightMesh = sphere.GetMesh();
+      const Mesh screen = quad.GetMesh();
 
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
-      //std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
-      //std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
-      //Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
-      //Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
-      //std::filesystem::path grassTexturePath = texturesPath / "grass.png";
-      //Texture grassAlbedo(grassTexturePath.string(), TextureType::DIFFUSE, 0);
-
-
-      std::filesystem::path modelsPath = GetResourcesPath() / "objects";
-      std::filesystem::path backpackPath = modelsPath / "backpack" / "backpack.obj";
-      std::filesystem::path grassPath = modelsPath / "grass" / "grass.fbx";
-      Model modelTest(Vertex3DLit, backpackPath);
-      Model grassModel(Vertex3DLit, grassPath);
-
-      const ModernGrass grass(grassModel);
+      std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
+      std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
+      Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
+      Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
 
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
       std::filesystem::path fragmentShaderPath = shadersPath / "objectMaterial.frag";
       std::filesystem::path vertexShaderLightPath = shadersPath / "objectFlatColor.vert";
       std::filesystem::path fragmentShaderLightPath = shadersPath / "objectFlatColor.frag";
-
-      std::filesystem::path computeShaderGrass = shadersPath / "billboardGrassComp.glsl";
-      std::filesystem::path vertexShaderGrass = shadersPath / "billboardGrassVert.glsl";
-      std::filesystem::path fragmentShaderGrass = shadersPath / "billboardGrassFrag.glsl";
-
-      ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
-      ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
-      ShaderVariants vertexLight(vertexShaderLightPath.string(), ShaderType::VERTEX);
-      ShaderVariants fragmentLight(fragmentShaderLightPath.string(), ShaderType::FRAGMENT);
-
-      ShaderVariants grassComp(computeShaderGrass.string(), ShaderType::COMPUTE);
-      ShaderVariants grassVert(vertexShaderGrass.string(), ShaderType::VERTEX);
-      ShaderVariants grassFrag(fragmentShaderGrass.string(), ShaderType::FRAGMENT);
+      std::filesystem::path vertexShaderScreen = shadersPath / "screenQuad.vert";
+      std::filesystem::path fragmentShaderScreen = shadersPath / "postProcGrayscale.frag";
 
       ShaderProgram program;
-      program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX", "USE_NORMAL_TEXTURE_MAP" }));
-      program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT", "USE_NORMAL_TEXTURE_MAP", "SPECULAR_IS_GRAY" }));
-      program.Compile();
-
       ShaderProgram lightProgram;
-      lightProgram.AttachShader(vertexLight.GetBaseShader());
-      lightProgram.AttachShader(fragmentLight.GetBaseShader());
-      lightProgram.Compile();
+      ShaderProgram screenProgram;
 
-      ShaderProgram grassComputeProgram;
-      grassComputeProgram.AttachShader(grassComp.GetBaseShader());
-      grassComputeProgram.Compile();
+      {
+          ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
+          ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
+          ShaderVariants vertexLight(vertexShaderLightPath.string(), ShaderType::VERTEX);
+          ShaderVariants fragmentLight(fragmentShaderLightPath.string(), ShaderType::FRAGMENT);
+          ShaderVariants vertexScreen(vertexShaderScreen.string(), ShaderType::VERTEX);
+          ShaderVariants fragmentScreen(fragmentShaderScreen.string(), ShaderType::FRAGMENT);
 
-      ShaderProgram grassProgram;
-      grassProgram.AttachShader(grassVert.GetBaseShader());
-      grassProgram.AttachShader(grassFrag.GetBaseShader());
-      grassProgram.Compile();
+          program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
+          program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
+          program.Compile();
+
+          lightProgram.AttachShader(vertexLight.GetBaseShader());
+          lightProgram.AttachShader(fragmentLight.GetBaseShader());
+          lightProgram.Compile();
+
+          screenProgram.AttachShader(vertexScreen.GetBaseShader());
+          screenProgram.AttachShader(fragmentScreen.GetBaseShader());
+          screenProgram.Compile();
+      }
 
       CameraData cameraData;
       UniformBlock cameraMatrices("CameraData", 2, sizeof(CameraData), &cameraData);
       program.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
-      grassComputeProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
-      grassProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
+      lightProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
       globalSampler.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
@@ -180,9 +175,6 @@ int main(void) {
       glEnable(GL_DEPTH_TEST);
 
       glEnable(GL_MULTISAMPLE);
-
-      //glEnable(GL_BLEND);
-      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
       glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
@@ -202,24 +194,25 @@ int main(void) {
           cameraData.projection = glm::perspective(glm::radians(camera.GetZoom()), static_cast<float>(currentWidth) / currentHeight, 0.1f, 100.0f);
           cameraData.viewPosition = camera.GetPosition();
           cameraMatrices.UpdateData(&cameraData, sizeof(CameraData));
-
-          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
           cameraMatrices.Bind();
 
-          program.Bind();
+          // FIRST PASS
+          render.BindFBO();
+          glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          glEnable(GL_DEPTH_TEST);
+          glDisable(GL_FRAMEBUFFER_SRGB);
 
+          program.Bind();
           program.SetFloat("uObjectMaterial.shininess", shininess);
           program.SetVec3("uObjectMaterial.ambient", glm::vec3(0.2, 0.2, 0.2));
-          //program.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
-          //program.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
-
+          program.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
+          program.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
           program.SetInt("uNumDirLights", 1);
           program.SetVec3("uDirLights[0].direction", lightDirection);
           program.SetVec3("uDirLights[0].ambient", lightColorAmbient * .25f);
           program.SetVec3("uDirLights[0].diffuse", lightColorDiffuse * .25f);
           program.SetVec3("uDirLights[0].specular", lightColorSpecular * .25f);
-
           program.SetInt("uNumPointLights", 1);
           program.SetVec3("uPointLights[0].ambient", lightColorAmbient);
           program.SetVec3("uPointLights[0].diffuse", lightColorDiffuse);
@@ -228,7 +221,6 @@ int main(void) {
           program.SetFloat("uPointLights[0].constant", constantAttenuation);
           program.SetFloat("uPointLights[0].linear", linearAttenuation);
           program.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
-
           program.SetInt("uNumSpotLights", 1);
           program.SetVec3("uSpotLights[0].position", camera.GetPosition());
           program.SetVec3("uSpotLights[0].direction", camera.GetFront());
@@ -241,61 +233,48 @@ int main(void) {
           program.SetFloat("uSpotLights[0].cutOff", cutOff);
           program.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
 
-          //globalSampler.Bind(albedoTexture.GetUnit());
-          //albedoTexture.Bind();
-
-          //globalSampler.Bind(specularTexture.GetUnit());
-          //specularTexture.Bind();
+          globalSampler.Bind(albedoTexture.GetUnit());
+          albedoTexture.Bind();
+          globalSampler.Bind(specularTexture.GetUnit());
+          specularTexture.Bind();
+          program.SetFloat("uObjectMaterial.shininess", shininess);
+          program.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
+          program.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
 
           glm::mat4 model(1.0f);
           glm::mat3 normal(1.0);
-        
-          for(int i = 0; i < 1; i++) {
-              program.Bind();
-
-              model = glm::translate(glm::mat4(1.0), cubePositions[i]);
-              //model = glm::scale(model, glm::vec3(1.0f + std::cos(glm::radians(currentTime * 0.5f)), 1.0f + std::sin(glm::radians(currentTime * 2.0f)), 1.0f));
-              //model = glm::rotate(model, glm::radians(45.0f * currentTime), glm::vec3(1.0, 1.0, 0.0));
-              normal = glm::mat3(glm::transpose(glm::inverse(model)));
-
-              program.SetMat4("model", model);
-              //program.SetMat3("normal", normal);
-
-              //mesh.Draw(program);
-              modelTest.Draw(program, globalSampler);
-          }
-
-
+          model = glm::rotate(model, glm::radians(30.0f), glm::vec3(0.0, 1.0, 0.0));
+          model = glm::translate(model, glm::vec3(-1.0, -0.25f, -2.0));
+          normal = glm::mat3(glm::transpose(glm::inverse(model)));
+          program.SetMat4("model", model);
+          program.SetMat3("normal", normal);
+          mesh.Draw(program, globalSampler);
+          albedoTexture.Unbind();
+          specularTexture.Unbind();
 
           model = glm::translate(glm::mat4(1.0), lightPosition);
-
           lightProgram.Bind();
           lightProgram.SetMat4("model", model);
           lightProgram.SetVec3("uAlbedoFlatColor", glm::vec3(1.0,1.0,1.0));
           lightProgram.SetVec3("uLightColor", glm::vec3(1.0,1.0,1.0));
-
-          lightMesh.Bind();
           lightMesh.Draw(lightProgram, globalSampler);
-          lightMesh.Unbind();
 
-          grassComputeProgram.Bind();
-          grassComputeProgram.SetVec3("uOrigin", glm::vec3(0.0, -1.0, 0.0));
-          grassComputeProgram.SetFloat("uSpacing", 0.15f);
-          grassComputeProgram.SetFloat("uHeight", 2.0f);
-          grassComputeProgram.SetFloat("uMaxDist", 100.0f);
+          // SECOND PASS
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);
+          glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+          glClear(GL_COLOR_BUFFER_BIT);
+          glDisable(GL_DEPTH_TEST);
+          glEnable(GL_FRAMEBUFFER_SRGB);
 
-          grassProgram.Bind();
-          grassProgram.SetVec3("uDirLight.direction", lightDirection);
-          grassProgram.SetVec3("uDirLight.ambient", lightColorAmbient);
-          grassProgram.SetVec3("uDirLight.diffuse", lightColorDiffuse);
-          grassProgram.SetVec3("uDirLight.specular", lightColorSpecular);
-          grassProgram.SetFloat("uSpecular", 0.85f);
-          grassProgram.SetFloat("uShininess", shininess);
-          grassProgram.SetFloat("uTime", currentTime);
-          grass.Draw(grassProgram, grassComputeProgram);
+          screenProgram.Bind();
+          glBindSampler(0, 0);
+          screenProgram.SetInt("uScreenTexture", 0);
+          render.BindTexture(0);
+          screen.Bind();
+          screen.Draw(screenProgram, globalSampler);
+          glBindTextureUnit(0, 0);
 
           glfwSwapBuffers(window);
-
           glfwPollEvents();
       }
       GetError();
@@ -338,6 +317,7 @@ void ProcessInput(GLFWwindow* window) {
 void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
     currentWidth = width;
     currentHeight = height;
+    render = RenderTexture(width, height);
     glViewport(0, 0, width, height);
 }
 
