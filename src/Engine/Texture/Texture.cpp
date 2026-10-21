@@ -31,6 +31,7 @@ Texture::Texture(const std::string &path, TextureType type, GLuint unit) : path(
     unsigned char* data = stbi_load(path.c_str(), &width, &height, &channels, 0);
     if(!data) {
         LOG("ERROR::TEXTURE_LOAD failed to load texture from: %s", path.c_str());
+        stbi_image_free(data);
         throw std::runtime_error("Failed to load texture: " + path);
     }
 
@@ -83,6 +84,8 @@ Texture::Texture(const std::string &path, TextureType type, GLuint unit) : path(
     glTextureStorage2D(ID, mipLevels, internalformat, width, height);
     glTextureSubImage2D(ID, 0, 0, 0, width, height, format, GL_UNSIGNED_BYTE, data);
     glGenerateTextureMipmap(ID);
+
+    stbi_image_free(data);
 }
 
 Texture::~Texture() {

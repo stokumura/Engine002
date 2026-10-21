@@ -80,6 +80,23 @@ void Mesh::Unbind() {
     glBindVertexArray(0);
 }
 
+void Mesh::Draw(ShaderProgram &shaderProgram) const {
+    if(!IsValid()) {
+        LOG("WARNING::MESH_DRAW mesh is not valid to draw, vertex array buffer draw aborted");
+        return;
+    }
+
+    shaderProgram.Bind();
+    Bind();
+    if(instances > 0) {
+        glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0, instances);
+    } else {
+        glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
+    }
+    Unbind();
+    shaderProgram.Unbind();
+}
+
 void Mesh::Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const {
     if(!IsValid()) {
         LOG("WARNING::MESH_DRAW mesh is not valid to draw, vertex array buffer draw aborted");

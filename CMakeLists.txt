@@ -135,6 +135,11 @@ SET(RENDER_TEXTURE
     "src/Engine/RenderTexture/RenderTexture.cpp"
 )
 
+SET(CUBEMAP
+    "src/Engine/Cubemap/Cubemap.h"
+    "src/Engine/Cubemap/Cubemap.cpp"
+)
+
 SET(ENGINE
     ${SHADER}
     ${CAMERA}
@@ -146,6 +151,7 @@ SET(ENGINE
     ${BILLBOARD_GRASS}
     ${MODERN_GRASS}
     ${RENDER_TEXTURE}
+    ${CUBEMAP}
     "src/Engine/Engine.h"
 )
 

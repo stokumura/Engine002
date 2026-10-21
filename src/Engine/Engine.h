@@ -10,3 +10,4 @@
 #include "BillboardGrass/BillboardGrass.h"
 #include "ModernGrass/ModernGrass.h"
 #include "RenderTexture/RenderTexture.h"
+#include "Cubemap/Cubemap.h"

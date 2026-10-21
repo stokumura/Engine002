@@ -32,6 +32,7 @@ class Mesh {
         void Bind() const;
         static void Unbind();
 
+        void Draw(ShaderProgram &shaderProgram) const;
         void Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const;
 
         GLuint GetVAO() const { return VAO; }

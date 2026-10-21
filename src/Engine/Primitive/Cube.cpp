@@ -1,6 +1,6 @@
 #include "Cube.h"
 
-Cube::Cube(const VertexAttributeTypeLayout &attributes, float length, unsigned int xSubdivisions, unsigned int ySubdivisions, unsigned int zSubdivisions) : Shape(attributes), length(length), xSubdivisions(xSubdivisions), ySubdivisions(ySubdivisions), zSubdivisions(zSubdivisions) {
+Cube::Cube(const VertexAttributeTypeLayout &attributes, float length, unsigned int xSubdivisions, unsigned int ySubdivisions, unsigned int zSubdivisions, bool invert) : Shape(attributes), length(length), xSubdivisions(xSubdivisions), ySubdivisions(ySubdivisions), zSubdivisions(zSubdivisions), invert(invert) {
     Build();
 }
 
@@ -40,11 +40,21 @@ Mesh Cube::ConstructMesh(const VertexAttributeTypeLayout &attributes) const {
                 unsigned int next = current + rowSize;
 
                 indices.push_back(current);
-                indices.push_back(current + 1);
-                indices.push_back(next);
+                if(invert) {
+                    indices.push_back(next);
+                    indices.push_back(current + 1);
+                } else {
+                    indices.push_back(current + 1);
+                    indices.push_back(next);
+                }
 
-                indices.push_back(current + 1);
-                indices.push_back(next + 1);
+                if(invert) {
+                    indices.push_back(next + 1);
+                    indices.push_back(current + 1);
+                } else {
+                    indices.push_back(current + 1);
+                    indices.push_back(next + 1);
+                }
                 indices.push_back(next);
             }
         }
@@ -52,9 +62,9 @@ Mesh Cube::ConstructMesh(const VertexAttributeTypeLayout &attributes) const {
         vertexCount += rowSize * (subV + 1);
     };
 
-    AddFace(glm::vec3(half, -half, -half), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), ySubdivisions, zSubdivisions); // +X
+    AddFace(glm::vec3(half, -half, half), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), ySubdivisions, zSubdivisions); // +X
     AddFace(glm::vec3(-half, -half, -half), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), zSubdivisions, ySubdivisions); // -X
-    AddFace(glm::vec3(-half, half, -half), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), zSubdivisions, xSubdivisions); //+Y
+    AddFace(glm::vec3(half, half, -half), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f), zSubdivisions, xSubdivisions); //+Y
     AddFace(glm::vec3(-half, -half, -half), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f), xSubdivisions, zSubdivisions); //-Y
     AddFace(glm::vec3(-half, -half, half), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), xSubdivisions, ySubdivisions); //+Z
     AddFace(glm::vec3(half, -half, -half), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), xSubdivisions, ySubdivisions); //-Z

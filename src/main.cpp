@@ -112,16 +112,29 @@ int main(void) {
       Sphere sphere(Vertex3DUnlit, 0.1f, 16, 16);
       Cube cube(Vertex3DLit, 1.0f, 16, 16, 16);
       Quad quad(Vertex2D);
+      Cube skyboxCube({ VertexAttributeType::POSITION3D }, 2.0f, 1, 1, 1, true);
 
       const Mesh &mesh = cube.GetMesh();
       const Mesh &lightMesh = sphere.GetMesh();
-      const Mesh screen = quad.GetMesh();
+      const Mesh &screen = quad.GetMesh();
+      const Mesh &skybox = skyboxCube.GetMesh();
 
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
       std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
       std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
       Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
       Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
+
+      std::filesystem::path skyboxTexturesParentPath = texturesPath / "skybox";
+      std::vector<std::string> cubemapFaces { 
+          "right.jpg",
+          "right.jpg",
+          "top.jpg",
+          "bottom.jpg",
+          "front.jpg",
+          "back.jpg"
+      };
+      Cubemap cubemapTex(skyboxTexturesParentPath, cubemapFaces);
 
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
@@ -130,11 +143,13 @@ int main(void) {
       std::filesystem::path fragmentShaderLightPath = shadersPath / "objectFlatColor.frag";
       std::filesystem::path vertexShaderScreen = shadersPath / "screenQuad.vert";
       std::filesystem::path fragmentShaderScreen = shadersPath / "postProcGrayscale.frag";
+      std::filesystem::path vertexShaderSkybox = shadersPath / "skybox.vert";
+      std::filesystem::path fragmentShaderSkybox = shadersPath / "skybox.frag";
 
       ShaderProgram program;
       ShaderProgram lightProgram;
       ShaderProgram screenProgram;
-
+      ShaderProgram skyboxProgram;
       {
           ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
           ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
@@ -142,6 +157,8 @@ int main(void) {
           ShaderVariants fragmentLight(fragmentShaderLightPath.string(), ShaderType::FRAGMENT);
           ShaderVariants vertexScreen(vertexShaderScreen.string(), ShaderType::VERTEX);
           ShaderVariants fragmentScreen(fragmentShaderScreen.string(), ShaderType::FRAGMENT);
+          ShaderVariants vertexSkybox(vertexShaderSkybox.string(), ShaderType::VERTEX);
+          ShaderVariants fragmentSkybox(fragmentShaderSkybox.string(), ShaderType::FRAGMENT);
 
           program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
           program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
@@ -154,6 +171,10 @@ int main(void) {
           screenProgram.AttachShader(vertexScreen.GetBaseShader());
           screenProgram.AttachShader(fragmentScreen.GetBaseShader());
           screenProgram.Compile();
+
+          skyboxProgram.AttachShader(vertexSkybox.GetBaseShader());
+          skyboxProgram.AttachShader(fragmentSkybox.GetBaseShader());
+          skyboxProgram.Compile();
       }
 
       CameraData cameraData;
@@ -175,6 +196,8 @@ int main(void) {
       glEnable(GL_DEPTH_TEST);
 
       glEnable(GL_MULTISAMPLE);
+
+      glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
       glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
@@ -258,6 +281,20 @@ int main(void) {
           lightProgram.SetVec3("uAlbedoFlatColor", glm::vec3(1.0,1.0,1.0));
           lightProgram.SetVec3("uLightColor", glm::vec3(1.0,1.0,1.0));
           lightMesh.Draw(lightProgram, globalSampler);
+
+          // SKYBOX
+          glDepthFunc(GL_LEQUAL);
+          skyboxProgram.Bind();
+          skyboxProgram.SetInt("uSkybox", 0);
+          skyboxProgram.SetMat4("uProjection", cameraData.projection);
+          glm::mat4 noTranslationViewMatrix = glm::mat4(glm::mat3(cameraData.view));
+          skyboxProgram.SetMat4("uView", noTranslationViewMatrix);
+          cubemapTex.Bind(0);
+          skybox.Bind();
+          skybox.Draw(skyboxProgram);
+          skybox.Unbind();
+          glBindTextureUnit(0, 0);
+          glDepthFunc(GL_LESS);
 
           // SECOND PASS
           glBindFramebuffer(GL_FRAMEBUFFER, 0);

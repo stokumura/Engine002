@@ -11,8 +11,9 @@ class Cube : public Shape {
         unsigned int xSubdivisions;
         unsigned int ySubdivisions;
         unsigned int zSubdivisions;
+        bool invert;
     public:
-        Cube(const VertexAttributeTypeLayout &attributes, float length, unsigned int xSubdivisions, unsigned int ySubdivisions, unsigned int zSubdivisions);
+        Cube(const VertexAttributeTypeLayout &attributes, float length, unsigned int xSubdivisions, unsigned int ySubdivisions, unsigned int zSubdivisions, bool invert = false);
     private:
         Mesh ConstructMesh(const VertexAttributeTypeLayout &attributes) const override;
 };
