@@ -19,6 +19,7 @@ class Model {
 
     public:
         Model(const VertexAttributeTypeLayout &attributes, const std::filesystem::path &path);
+        void Draw(ShaderProgram &shaderProgram) const;
         void Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const;
 
         const Mesh &GetMesh(int index) const { return meshes[index]; };

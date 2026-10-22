@@ -128,7 +128,7 @@ int main(void) {
       std::filesystem::path skyboxTexturesParentPath = texturesPath / "skybox";
       std::vector<std::string> cubemapFaces { 
           "right.jpg",
-          "right.jpg",
+          "left.jpg",
           "top.jpg",
           "bottom.jpg",
           "front.jpg",
@@ -145,11 +145,15 @@ int main(void) {
       std::filesystem::path fragmentShaderScreen = shadersPath / "postProcGrayscale.frag";
       std::filesystem::path vertexShaderSkybox = shadersPath / "skybox.vert";
       std::filesystem::path fragmentShaderSkybox = shadersPath / "skybox.frag";
+      std::filesystem::path fragmentShaderReflection = shadersPath / "objectReflect.frag";
+      std::filesystem::path fragmentShaderRefraction = shadersPath / "objectRefract.frag";
 
       ShaderProgram program;
       ShaderProgram lightProgram;
       ShaderProgram screenProgram;
       ShaderProgram skyboxProgram;
+      ShaderProgram reflectionProgram;
+      ShaderProgram refractionProgram;
       {
           ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
           ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
@@ -159,6 +163,8 @@ int main(void) {
           ShaderVariants fragmentScreen(fragmentShaderScreen.string(), ShaderType::FRAGMENT);
           ShaderVariants vertexSkybox(vertexShaderSkybox.string(), ShaderType::VERTEX);
           ShaderVariants fragmentSkybox(fragmentShaderSkybox.string(), ShaderType::FRAGMENT);
+          ShaderVariants fragmentReflection(fragmentShaderReflection.string(), ShaderType::FRAGMENT);
+          ShaderVariants fragmentRefraction(fragmentShaderRefraction.string(), ShaderType::FRAGMENT);
 
           program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
           program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
@@ -175,12 +181,22 @@ int main(void) {
           skyboxProgram.AttachShader(vertexSkybox.GetBaseShader());
           skyboxProgram.AttachShader(fragmentSkybox.GetBaseShader());
           skyboxProgram.Compile();
+
+          reflectionProgram.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
+          reflectionProgram.AttachShader(fragmentReflection.GetBaseShader());
+          reflectionProgram.Compile();
+
+          refractionProgram.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
+          refractionProgram.AttachShader(fragmentRefraction.GetBaseShader());
+          refractionProgram.Compile();
       }
 
       CameraData cameraData;
       UniformBlock cameraMatrices("CameraData", 2, sizeof(CameraData), &cameraData);
       program.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       lightProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
+      reflectionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
+      refractionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
       globalSampler.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
@@ -275,6 +291,32 @@ int main(void) {
           albedoTexture.Unbind();
           specularTexture.Unbind();
 
+          // ENVIRONMENT DYNAMIC
+          reflectionProgram.Bind();
+          model = glm::translate(glm::mat4(1.0), glm::vec3(-4.0, 0.0f, -1.0));
+          normal = glm::mat3(glm::transpose(glm::inverse(model)));
+          reflectionProgram.SetMat4("model", model);
+          reflectionProgram.SetMat3("normal", normal);
+          glBindSampler(0, 0);
+          cubemapTex.Bind(0);
+          reflectionProgram.SetInt("uSkybox", 0);
+          mesh.Draw(reflectionProgram);
+          glBindTextureUnit(0, 0);
+
+          refractionProgram.Bind();
+          model = glm::translate(glm::mat4(1.0), glm::vec3(2.0, 0.0f, -1.0));
+          normal = glm::mat3(glm::transpose(glm::inverse(model)));
+          refractionProgram.SetMat4("model", model);
+          refractionProgram.SetMat3("normal", normal);
+          glBindSampler(0, 0);
+          cubemapTex.Bind(0);
+          refractionProgram.SetInt("uSkybox", 0);
+          refractionProgram.SetFloat("uRefractionRatio", 1.0f / 1.52f);
+          mesh.Draw(refractionProgram);
+          glBindTextureUnit(0, 0);
+
+
+          // LIGHT MESH
           model = glm::translate(glm::mat4(1.0), lightPosition);
           lightProgram.Bind();
           lightProgram.SetMat4("model", model);
@@ -285,6 +327,7 @@ int main(void) {
           // SKYBOX
           glDepthFunc(GL_LEQUAL);
           skyboxProgram.Bind();
+          glBindSampler(0, 0);
           skyboxProgram.SetInt("uSkybox", 0);
           skyboxProgram.SetMat4("uProjection", cameraData.projection);
           glm::mat4 noTranslationViewMatrix = glm::mat4(glm::mat3(cameraData.view));

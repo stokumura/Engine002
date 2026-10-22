@@ -8,6 +8,11 @@ Model::Model(const VertexAttributeTypeLayout& attributes, const std::filesystem:
     loadModel(path);
 }
 
+void Model::Draw(ShaderProgram &shaderProgram) const {
+    for(unsigned int i = 0; i < meshes.size(); i++)
+        meshes[i].Draw(shaderProgram);
+}
+
 void Model::Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const {
     for(unsigned int i = 0; i < meshes.size(); i++)
         meshes[i].Draw(shaderProgram, sampler);
