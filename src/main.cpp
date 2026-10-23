@@ -23,6 +23,7 @@
 #include "Engine/RenderTexture/RenderTexture.h"
 #include "Engine/Shader/Shader.h"
 #include "Engine/ShaderVariants/ShaderVariants.h"
+#include "Utils/ExecutablePath/ExecutablePath.h"
 #include "Utils/Utils.h"
 
 const unsigned int samples {4};
@@ -56,7 +57,7 @@ glm::vec3 lightColorSpecular(0.5f, 0.5f, 0.5f);
 glm::vec3 lightPosition(2.0f, 3.0f, -3.0f);
 glm::vec3 lightDirection(-0.2f, -0.1f, -0.3f);
 
-float shininess = 32.0f;
+float shininess = 16.0f;
 float constantAttenuation = 1.0f;
 float linearAttenuation = 0.09f;
 float quadraticAttenuation = 0.032f;
@@ -136,6 +137,10 @@ int main(void) {
       };
       Cubemap cubemapTex(skyboxTexturesParentPath, cubemapFaces);
 
+      std::filesystem::path modelsPath = GetResourcesPath() / "objects";
+      std::filesystem::path backpackPath = modelsPath / "backpack" / "backpack.obj";
+      Model backpack(Vertex3DLit, backpackPath);
+
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
       std::filesystem::path fragmentShaderPath = shadersPath / "objectMaterial.frag";
@@ -149,6 +154,7 @@ int main(void) {
       std::filesystem::path fragmentShaderRefraction = shadersPath / "objectRefract.frag";
 
       ShaderProgram program;
+      ShaderProgram modelProgram;
       ShaderProgram lightProgram;
       ShaderProgram screenProgram;
       ShaderProgram skyboxProgram;
@@ -169,6 +175,10 @@ int main(void) {
           program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
           program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
           program.Compile();
+
+          modelProgram.AttachShader(vertex.GetShader({ "USE_NORMAL_TEXTURE_MAP" }));
+          modelProgram.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_NORMAL_TEXTURE_MAP" , "USE_ALBEDO_AS_AMBIENT", "SPECULAR_IS_GRAY" }));
+          modelProgram.Compile();
 
           lightProgram.AttachShader(vertexLight.GetBaseShader());
           lightProgram.AttachShader(fragmentLight.GetBaseShader());
@@ -194,6 +204,7 @@ int main(void) {
       CameraData cameraData;
       UniformBlock cameraMatrices("CameraData", 2, sizeof(CameraData), &cameraData);
       program.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
+      modelProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       lightProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       reflectionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       refractionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
@@ -242,6 +253,7 @@ int main(void) {
           glEnable(GL_DEPTH_TEST);
           glDisable(GL_FRAMEBUFFER_SRGB);
 
+          // CONTAINER
           program.Bind();
           program.SetFloat("uObjectMaterial.shininess", shininess);
           program.SetVec3("uObjectMaterial.ambient", glm::vec3(0.2, 0.2, 0.2));
@@ -276,9 +288,6 @@ int main(void) {
           albedoTexture.Bind();
           globalSampler.Bind(specularTexture.GetUnit());
           specularTexture.Bind();
-          program.SetFloat("uObjectMaterial.shininess", shininess);
-          program.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
-          program.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
 
           glm::mat4 model(1.0f);
           glm::mat3 normal(1.0);
@@ -290,6 +299,42 @@ int main(void) {
           mesh.Draw(program, globalSampler);
           albedoTexture.Unbind();
           specularTexture.Unbind();
+
+          // MODEL
+          modelProgram.Bind();
+          modelProgram.SetFloat("uObjectMaterial.shininess", shininess);
+          modelProgram.SetVec3("uObjectMaterial.ambient", glm::vec3(0.2, 0.2, 0.2));
+          modelProgram.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
+          modelProgram.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
+          modelProgram.SetInt("uNumDirLights", 1);
+          modelProgram.SetVec3("uDirLights[0].direction", lightDirection);
+          modelProgram.SetVec3("uDirLights[0].ambient", lightColorAmbient * .25f);
+          modelProgram.SetVec3("uDirLights[0].diffuse", lightColorDiffuse * .25f);
+          modelProgram.SetVec3("uDirLights[0].specular", lightColorSpecular * .25f);
+          modelProgram.SetInt("uNumPointLights", 1);
+          modelProgram.SetVec3("uPointLights[0].ambient", lightColorAmbient);
+          modelProgram.SetVec3("uPointLights[0].diffuse", lightColorDiffuse);
+          modelProgram.SetVec3("uPointLights[0].specular", lightColorSpecular);
+          modelProgram.SetVec3("uPointLights[0].position", lightPosition);
+          modelProgram.SetFloat("uPointLights[0].constant", constantAttenuation);
+          modelProgram.SetFloat("uPointLights[0].linear", linearAttenuation);
+          modelProgram.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
+          modelProgram.SetInt("uNumSpotLights", 1);
+          modelProgram.SetVec3("uSpotLights[0].position", camera.GetPosition());
+          modelProgram.SetVec3("uSpotLights[0].direction", camera.GetFront());
+          modelProgram.SetVec3("uSpotLights[0].ambient", lightColorAmbient);
+          modelProgram.SetVec3("uSpotLights[0].diffuse", lightColorDiffuse);
+          modelProgram.SetVec3("uSpotLights[0].specular", lightColorSpecular);
+          modelProgram.SetFloat("uSpotLights[0].constant", constantAttenuation);
+          modelProgram.SetFloat("uSpotLights[0].linear", linearAttenuation);
+          modelProgram.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
+          modelProgram.SetFloat("uSpotLights[0].cutOff", cutOff);
+          modelProgram.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
+          modelProgram.SetFloat("uObjectMaterial.shininess", shininess);
+
+          model = glm::translate(glm::mat4(1.0f), glm::vec3(3.0, -1.0, -3.0));
+          modelProgram.SetMat4("model", model);
+          backpack.Draw(modelProgram, globalSampler);
 
           // ENVIRONMENT DYNAMIC
           reflectionProgram.Bind();

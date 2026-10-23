@@ -156,9 +156,13 @@ vec4 GetPointLight (PointLight light, Object object) {
 
 #ifndef DISABLE_SPECULAR
     vec3 viewDirection = normalize(fs_in.ViewPosition - fs_in.FragPos);
-    vec3 reflectDirection = reflect(-lightDirection, normalDirection);
-
-    vec3 specular = pow(max(dot(viewDirection, reflectDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #ifdef ONLY_PHONG
+        vec3 reflectDirection = reflect(-lightDirection, normalDirection);
+        vec3 specular = pow(max(dot(viewDirection, reflectDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #else
+        vec3 halfwayDirection = normalize(lightDirection + viewDirection);
+        vec3 specular = pow(max(dot(normalDirection, halfwayDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #endif
 #else
     vec3 specular = vec3(0.0);
 #endif
@@ -186,9 +190,13 @@ vec4 GetDirectionalLight (DirectionalLight light, Object object) {
 
 #ifndef DISABLE_SPECULAR
     vec3 viewDirection = normalize(fs_in.ViewPosition - fs_in.FragPos);
-    vec3 reflectDirection = reflect(-lightDirection, normalDirection);
-
-    vec3 specular = pow(max(dot(viewDirection, reflectDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #ifdef ONLY_PHONG
+        vec3 reflectDirection = reflect(-lightDirection, normalDirection);
+        vec3 specular = pow(max(dot(viewDirection, reflectDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #else
+        vec3 halfwayDirection = normalize(lightDirection + viewDirection);
+        vec3 specular = pow(max(dot(normalDirection, halfwayDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #endif
 #else
     vec3 specular = vec3(0.0);
 #endif
@@ -217,9 +225,13 @@ vec4 GetSpotLight(SpotLight light, Object object) {
 
 #ifndef DISABLE_SPECULAR
     vec3 viewDirection = normalize(fs_in.ViewPosition - fs_in.FragPos);
-    vec3 reflectDirection = reflect(-lightDirection, normalDirection);
-
-    vec3 specular = pow(max(dot(viewDirection, reflectDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #ifdef ONLY_PHONG
+        vec3 reflectDirection = reflect(-lightDirection, normalDirection);
+        vec3 specular = pow(max(dot(viewDirection, reflectDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #else
+        vec3 halfwayDirection = normalize(lightDirection + viewDirection);
+        vec3 specular = pow(max(dot(normalDirection, halfwayDirection), 0.0), uObjectMaterial.shininess) * object.specular * light.specular;
+    #endif
 #else
     vec3 specular = vec3(0.0);
 #endif
