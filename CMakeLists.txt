@@ -140,6 +140,11 @@ SET(CUBEMAP
     "src/Engine/Cubemap/Cubemap.cpp"
 )
 
+SET(SHADOW_MAP
+    "src/Engine/ShadowMap/ShadowMap.h"
+    "src/Engine/ShadowMap/ShadowMap.cpp"
+)
+
 SET(ENGINE
     ${SHADER}
     ${CAMERA}
@@ -152,6 +157,7 @@ SET(ENGINE
     ${MODERN_GRASS}
     ${RENDER_TEXTURE}
     ${CUBEMAP}
+    ${SHADOW_MAP}
     "src/Engine/Engine.h"
 )
 

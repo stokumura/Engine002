@@ -8,6 +8,9 @@ out VS_OUT {
     vec2 TexCoords;
     vec3 Normal;
     vec3 ViewPosition;
+#ifdef USE_LIGHT_SPACE_MATRIX
+    vec4 FragPosLightSpace;
+#endif
 } vs_out;
 
 layout(std140) uniform CameraData {
@@ -18,6 +21,9 @@ layout(std140) uniform CameraData {
 
 uniform mat4 model;
 uniform mat3 normal;
+#ifdef USE_LIGHT_SPACE_MATRIX
+uniform mat4 uLightSpaceMatrix;
+#endif
 
 void main() {
     vs_out.TexCoords = aTexCoords;
@@ -32,6 +38,10 @@ void main() {
 #endif
 
     vs_out.ViewPosition = viewPosition;
+
+#ifdef USE_LIGHT_SPACE_MATRIX
+    vs_out.FragPosLightSpace = uLightSpaceMatrix * vec4(vs_out.FragPos, 1.0);
+#endif
 
     gl_Position = projection * view * vec4(vs_out.FragPos, 1.0);
 }

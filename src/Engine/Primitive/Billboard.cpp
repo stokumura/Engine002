@@ -33,7 +33,7 @@ Mesh Billboard::ConstructMesh(const VertexAttributeTypeLayout &attributes) const
                 glm::vec3 position = origin + (fu * length) * axisY + (fvN * length) * axisX;
                 glm::vec2 texCoords(fv, fu);
 
-                AddVertex(vertices, attributes, position, texCoords, axisZ, axisY, axisX);
+                AddVertex(vertices, attributes, position, texCoords, -axisZ, axisY, axisX);
             }
         }
 

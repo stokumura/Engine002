@@ -1,0 +1,48 @@
+#version 460 core
+layout (location = 0) in vec3 aPos;
+layout (location = 1) in vec2 aTexCoords;
+layout (location = 2) in vec3 aNormal;
+
+out VS_OUT {
+    vec3 FragPos;
+    vec2 TexCoords;
+    vec3 Normal;
+    vec3 ViewPosition;
+#ifdef USE_LIGHT_SPACE_MATRIX
+    vec4 FragPosLightSpace;
+#endif
+} vs_out;
+
+layout(std140) uniform CameraData {
+    mat4 view;
+    mat4 projection;
+    vec3 viewPosition;
+};
+
+uniform mat4 model;
+uniform mat3 normal;
+#ifdef USE_LIGHT_SPACE_MATRIX
+uniform mat4 uLightSpaceMatrix;
+#endif
+
+void main() {
+    vs_out.FragPos = vec3(model * vec4(aPos, 1.0));
+    vs_out.TexCoords = fract(vs_out.FragPos.xz);
+
+#ifndef USE_NORMAL_TEXTURE_MAP
+    #ifdef USE_NORMAL_MATRIX
+        vs_out.Normal = normal * aNormal;
+    #else
+        vs_out.Normal = mat3(transpose(inverse(model))) * aNormal; 
+    #endif
+#endif
+
+    vs_out.ViewPosition = viewPosition;
+
+#ifdef USE_LIGHT_SPACE_MATRIX
+    vs_out.FragPosLightSpace = uLightSpaceMatrix * vec4(vs_out.FragPos, 1.0);
+#endif
+
+    gl_Position = projection * view * vec4(vs_out.FragPos, 1.0);
+}
+
