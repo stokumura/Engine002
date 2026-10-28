@@ -115,7 +115,7 @@ vec4 GetDirectionalLight (DirectionalLight light, Object object) {
 #endif
 
     float shadow = ShadowCalculation(light, object);
-    vec3 result = (1.0 - shadow) * (ambient + diffuse + specular);
+    vec3 result = ambient + (diffuse + specular) * (1.0 - shadow);
     return vec4(result, 1.0);
 }
 

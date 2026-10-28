@@ -11,4 +11,4 @@
 #include "ModernGrass/ModernGrass.h"
 #include "RenderTexture/RenderTexture.h"
 #include "Cubemap/Cubemap.h"
-#include "ShadowMap/ShadowMap.h"
+#include "ShadowMap/ShadowCubemap.h"

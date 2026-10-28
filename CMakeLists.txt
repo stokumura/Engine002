@@ -143,6 +143,8 @@ SET(CUBEMAP
 SET(SHADOW_MAP
     "src/Engine/ShadowMap/ShadowMap.h"
     "src/Engine/ShadowMap/ShadowMap.cpp"
+    "src/Engine/ShadowMap/ShadowCubemap.h"
+    "src/Engine/ShadowMap/ShadowCubemap.cpp"
 )
 
 SET(ENGINE
