@@ -65,10 +65,6 @@ void ShadowCubemap::Setup() {
     glCreateTextures(GL_TEXTURE_CUBE_MAP, 1, &depthCubemap);
     glTextureStorage2D(depthCubemap, 1, GL_DEPTH_COMPONENT24, SHADOW_WIDTH, SHADOW_HEIGHT);
 
-    for (unsigned int face = 0; face < 6; face++) {
-        glTextureSubImage3D(depthCubemap, 0, 0, 0, face, SHADOW_WIDTH, SHADOW_HEIGHT, 1, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-    }
-
     glTextureParameteri(depthCubemap, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTextureParameteri(depthCubemap, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTextureParameteri(depthCubemap, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);

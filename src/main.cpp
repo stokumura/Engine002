@@ -299,10 +299,10 @@ int main(void) {
           depthMapProgram.Bind();
           depthMapProgram.SetFloat("uFarPlane", far_plane);
           depthMapProgram.SetVec3("uLightPosition", lightPosition);
-          for(unsigned int face = 0; face < 6; face++) {
-              char* uniform_name;
-              sprintf(uniform_name, "uShadowMatrices[%d]", face);
-              depthMapProgram.SetMat4(uniform_name, shadowTransforms[face]);
+          for (unsigned int face = 0; face < 6; face++) {
+            char uniform_name[64];
+            snprintf(uniform_name, sizeof(uniform_name), "uShadowMatrices[%d]", face);
+            depthMapProgram.SetMat4(uniform_name, shadowTransforms[face]);
           }
           // CONTAINER - SHADOW
           glm::mat4 model(1.0f);
