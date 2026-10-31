@@ -55,6 +55,8 @@ float quadraticAttenuation = 0.032f;
 float cutOff = glm::cos(glm::radians(12.5f));
 float outerCutOff = glm::cos(glm::radians(17.5f));
 
+float heightScale = 0.1f;
+
 RenderTexture render;
 
 int main(void) {
@@ -121,13 +123,15 @@ int main(void) {
       std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
       std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
       std::filesystem::path woodAlbedoTexturePath = texturesPath / "wood.png";
-      std::filesystem::path brickwallAlbedoTexturePath = texturesPath / "brickwall.jpg";
-      std::filesystem::path brickwallNormalTexturePath = texturesPath / "brickwall_normal.jpg";
+      std::filesystem::path brickwallAlbedoTexturePath = texturesPath / "bricks2.jpg";
+      std::filesystem::path brickwallNormalTexturePath = texturesPath / "bricks2_normal.jpg";
+      std::filesystem::path brickwallDispTexturePath = texturesPath / "bricks2_disp.jpg";
       Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
       Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
       Texture woodAlbedoTexture(woodAlbedoTexturePath.string(), TextureType::DIFFUSE, 0);
       Texture brickwallAlbedoTexture(brickwallAlbedoTexturePath.string(), TextureType::DIFFUSE, 0);
       Texture brickwallNormalTexture(brickwallNormalTexturePath.string(), TextureType::NORMAL, 1);
+      Texture brickwallDispTexture(brickwallDispTexturePath.string(), TextureType::DISPLACEMENT, 2);
 
       std::filesystem::path skyboxTexturesParentPath = texturesPath / "skybox";
       std::vector<std::string> cubemapFaces { 
@@ -228,7 +232,7 @@ int main(void) {
           depthMapProgram.Compile();
 
           tangentNormalProgram.AttachShader(vertexTangentNormal.GetBaseShader());
-          tangentNormalProgram.AttachShader(fragmentTangentNormal.GetBaseShader());
+          tangentNormalProgram.AttachShader(fragmentTangentNormal.GetShader({ "USE_PARALLAX_MAP", "USE_STEEP_PARALLAX_MAP" }));
           tangentNormalProgram.Compile();
       }
 
@@ -497,15 +501,21 @@ int main(void) {
           tangentNormalProgram.SetVec3("uLightPosition", lightPosition);
           globalSampler.Bind(brickwallAlbedoTexture.GetUnit());
           globalSampler.Bind(brickwallNormalTexture.GetUnit());
+          globalSampler.Bind(brickwallDispTexture.GetUnit());
           brickwallAlbedoTexture.Bind();
           brickwallNormalTexture.Bind();
+          brickwallDispTexture.Bind();
           tangentNormalProgram.SetInt("diffuseMap", brickwallAlbedoTexture.GetUnit());
           tangentNormalProgram.SetInt("normalMap", brickwallNormalTexture.GetUnit());
+          tangentNormalProgram.SetInt("depthMap", brickwallDispTexture.GetUnit());
+          tangentNormalProgram.SetFloat("uHeightScale", heightScale);
           planeNormal.Draw(tangentNormalProgram);
-          glBindSampler(brickwallAlbedoTexture.GetUnit(), 1);
+          glBindSampler(brickwallAlbedoTexture.GetUnit(), 0);
           glBindSampler(brickwallNormalTexture.GetUnit(), 0);
+          glBindSampler(brickwallDispTexture.GetUnit(), 0);
           brickwallAlbedoTexture.Unbind();
           brickwallNormalTexture.Unbind();
+          brickwallDispTexture.Unbind();
 
           // SKYBOX
           glDepthFunc(GL_LEQUAL);

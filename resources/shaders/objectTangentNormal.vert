@@ -30,7 +30,7 @@ void main() {
     vec3 T = normalize(vec3(model * vec4(aTangent, 0.0)));
     vec3 N = normalize(vec3(model * vec4(aNormal, 0.0)));
     T = normalize(T - dot(T, N) * N);
-    vec3 B = cross(N, T);
+    vec3 B = cross(T, N);
 
     mat3 TBN = transpose(mat3(T, B, N));
     vs_out.TangentLightPos = TBN * uLightPosition;

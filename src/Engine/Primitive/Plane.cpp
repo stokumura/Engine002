@@ -13,7 +13,7 @@ Mesh Plane::ConstructMesh(const VertexAttributeTypeLayout &attributes) const {
     unsigned int vertexCount = 0;
 
     auto AddPlane = [&](const glm::vec3 &origin, glm::quat rot) {
-        unsigned int rowSize = xSubdivisions + 1;
+        unsigned int rowSize = ySubdivisions + 1;
 
         glm::vec3 axisX = rot * glm::vec3(1.0, 0.0, 0.0);
         glm::vec3 axisZ = rot * glm::vec3(0.0, 0.0, 1.0);
@@ -30,7 +30,7 @@ Mesh Plane::ConstructMesh(const VertexAttributeTypeLayout &attributes) const {
                 glm::vec3 position = origin + (fu * length) * axisY + (fv * length) * axisX;
                 glm::vec2 texCoords(fv, fu);
 
-                AddVertex(vertices, attributes, position, texCoords, -axisZ, axisX, axisY);
+                AddVertex(vertices, attributes, position, texCoords, -axisZ, axisX, -axisY);
             }
         }
 
@@ -51,7 +51,7 @@ Mesh Plane::ConstructMesh(const VertexAttributeTypeLayout &attributes) const {
             }
         }
 
-        vertexCount += rowSize * (ySubdivisions + 1);
+        vertexCount += rowSize * (xSubdivisions + 1);
     };
 
     AddPlane(glm::vec3(0.0, 0.0, 0.0), rotation);
