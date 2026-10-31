@@ -9,7 +9,8 @@ RenderTexture::RenderTexture() {
     depth = 0;
     error = 0;
 }
-RenderTexture::RenderTexture(unsigned int width, unsigned int height) : width(width), height(height) {
+
+RenderTexture::RenderTexture(unsigned int width, unsigned int height, bool hdr) : hdr(hdr), width(width), height(height) {
     SetupAttachments();
     CheckAttachments();
 }
@@ -18,7 +19,8 @@ RenderTexture::~RenderTexture() {
     Destroy();
 }
 
-RenderTexture::RenderTexture(RenderTexture &&other) noexcept : width(other.width), height(other.height), FBO(other.FBO), color(other.color), depth(other.depth), error(other.error) {
+RenderTexture::RenderTexture(RenderTexture &&other) noexcept : hdr(other.hdr), width(other.width), height(other.height), FBO(other.FBO), color(other.color), depth(other.depth), error(other.error) {
+    other.hdr = false;
     other.width = 0;
     other.height = 0;
     other.FBO = 0;
@@ -32,6 +34,7 @@ RenderTexture& RenderTexture::operator=(RenderTexture &&other) noexcept {
 
     Destroy();
 
+    hdr = other.hdr;
     width = other.width;
     height = other.height;
     FBO = other.FBO;
@@ -39,6 +42,7 @@ RenderTexture& RenderTexture::operator=(RenderTexture &&other) noexcept {
     depth = other.depth;
     error = other.error;
 
+    other.hdr = false;
     other.width = 0;
     other.height = 0;
     other.FBO = 0;
@@ -77,8 +81,11 @@ void RenderTexture::Blit(GLuint targetFBO, int offsetX, int offsetY) const {
 }
 
 void RenderTexture::SetupAttachments() {
+    GLenum internalFormat = GL_RGBA8;
+    if(hdr) internalFormat = GL_RGBA16F;
+
     glCreateTextures(GL_TEXTURE_2D, 1, &color);
-    glTextureStorage2D(color, 1, GL_RGB16F, width, height);
+    glTextureStorage2D(color, 1, internalFormat, width, height);
     glTextureParameteri(color, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTextureParameteri(color, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 

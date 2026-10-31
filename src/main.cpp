@@ -101,7 +101,7 @@ int main(void) {
   }
 
   {
-      render = RenderTexture(currentWidth, currentHeight);
+      render = RenderTexture(currentWidth, currentHeight, true);
       ShadowCubemap shadowCubemap;
 
       Sphere sphere(Vertex3DUnlit, 0.1f, 16, 16);
@@ -154,7 +154,7 @@ int main(void) {
       std::filesystem::path vertexShaderLightPath = shadersPath / "objectFlatColor.vert";
       std::filesystem::path fragmentShaderLightPath = shadersPath / "objectFlatColor.frag";
       std::filesystem::path vertexShaderScreen = shadersPath / "screenQuad.vert";
-      std::filesystem::path fragmentShaderScreen = shadersPath / "postProcGrayscale.frag";
+      std::filesystem::path fragmentShaderScreen = shadersPath / "tonemapping.frag";
       std::filesystem::path vertexShaderSkybox = shadersPath / "skybox.vert";
       std::filesystem::path fragmentShaderSkybox = shadersPath / "skybox.frag";
       std::filesystem::path fragmentShaderReflection = shadersPath / "objectReflect.frag";
@@ -539,9 +539,15 @@ int main(void) {
           glDisable(GL_DEPTH_TEST);
           glEnable(GL_FRAMEBUFFER_SRGB);
 
+          float parameter = glm::sin(glm::radians(15.0f * currentTime)) * 0.5 + 0.5;
+          float minExposure = 0.1f;
+          float maxExposure = 1.0f;
+          float exposure = maxExposure * parameter + minExposure * (1.0f - parameter);
+
           screenProgram.Bind();
           glBindSampler(0, 0);
           screenProgram.SetInt("uScreenTexture", 0);
+          screenProgram.SetFloat("uExposure", exposure);
           render.BindTexture(0);
           screen.Bind();
           screen.Draw(screenProgram, globalSampler);
@@ -590,7 +596,7 @@ void ProcessInput(GLFWwindow* window) {
 void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
     currentWidth = width;
     currentHeight = height;
-    render = RenderTexture(width, height);
+    render = RenderTexture(width, height, true);
     glViewport(0, 0, width, height);
 }
 

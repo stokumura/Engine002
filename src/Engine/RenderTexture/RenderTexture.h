@@ -4,13 +4,14 @@
 
 class RenderTexture {
     private:
+        bool hdr;
         unsigned int width, height;
         GLuint color, depth, FBO;
 
         mutable bool error = false;
     public:
         RenderTexture();
-        RenderTexture(unsigned int width, unsigned int height);
+        RenderTexture(unsigned int width, unsigned int height, bool hdr = false);
         ~RenderTexture();
 
         RenderTexture(const RenderTexture &other) = delete;
