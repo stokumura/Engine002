@@ -8,17 +8,10 @@
 
 #include <cmath>
 #include <cstdio>
-#include <glm/ext/matrix_clip_space.hpp>
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/ext/vector_float3.hpp>
+#include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 #include <filesystem>
-#include <glm/matrix.hpp>
-#include <glm/trigonometric.hpp>
 #include <iostream>
 
 #include "Engine/Engine.h"
@@ -114,20 +107,27 @@ int main(void) {
       Quad quad(Vertex2D);
       Cube skyboxCube({ VertexAttributeType::POSITION3D }, 2.0f, 1, 1, 1, true);
       Billboard planeBillboard(Vertex3DLit, 1, 16, 16, 50.0f);
+      glm::quat normalPlaneRotation = glm::angleAxis(glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+      Plane planeNormalMap(Vertex3DLitFull, 16, 16, 5.0f, normalPlaneRotation);
 
       const Mesh &mesh = cube.GetMesh();
       const Mesh &lightMesh = sphere.GetMesh();
       const Mesh &screen = quad.GetMesh();
       const Mesh &skybox = skyboxCube.GetMesh();
       const Mesh &plane = planeBillboard.GetMesh();
+      const Mesh &planeNormal = planeNormalMap.GetMesh();
 
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
       std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
       std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
       std::filesystem::path woodAlbedoTexturePath = texturesPath / "wood.png";
+      std::filesystem::path brickwallAlbedoTexturePath = texturesPath / "brickwall.jpg";
+      std::filesystem::path brickwallNormalTexturePath = texturesPath / "brickwall_normal.jpg";
       Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
       Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
       Texture woodAlbedoTexture(woodAlbedoTexturePath.string(), TextureType::DIFFUSE, 0);
+      Texture brickwallAlbedoTexture(brickwallAlbedoTexturePath.string(), TextureType::DIFFUSE, 0);
+      Texture brickwallNormalTexture(brickwallNormalTexturePath.string(), TextureType::NORMAL, 1);
 
       std::filesystem::path skyboxTexturesParentPath = texturesPath / "skybox";
       std::vector<std::string> cubemapFaces { 
@@ -159,6 +159,8 @@ int main(void) {
       std::filesystem::path vertexShaderDepthMap = shadersPath / "simpleDepthCubemap.vert";
       std::filesystem::path geometryShaderDepthMap = shadersPath / "simpleDepthCubemap.geom";
       std::filesystem::path fragmentShaderDepthMap = shadersPath / "simpleDepthCubemap.frag";
+      std::filesystem::path vertexShaderTangentNormalMap = shadersPath / "objectTangentNormal.vert";
+      std::filesystem::path fragmentShaderTangentNormalMap = shadersPath / "objectTangentNormal.frag";
 
       ShaderProgram program;
       ShaderProgram modelProgram;
@@ -169,6 +171,7 @@ int main(void) {
       ShaderProgram reflectionProgram;
       ShaderProgram refractionProgram;
       ShaderProgram depthMapProgram;
+      ShaderProgram tangentNormalProgram;
       {
           ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
           ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
@@ -184,6 +187,8 @@ int main(void) {
           ShaderVariants vertexDepthMap(vertexShaderDepthMap.string(), ShaderType::VERTEX);
           ShaderVariants geometryDepthMap(geometryShaderDepthMap.string(), ShaderType::GEOMETRY);
           ShaderVariants fragmentDepthMap(fragmentShaderDepthMap.string(), ShaderType::FRAGMENT);
+          ShaderVariants vertexTangentNormal(vertexShaderTangentNormalMap.string(), ShaderType::VERTEX);
+          ShaderVariants fragmentTangentNormal(fragmentShaderTangentNormalMap.string(), ShaderType::FRAGMENT);
 
           program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
           program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
@@ -221,6 +226,10 @@ int main(void) {
           depthMapProgram.AttachShader(geometryDepthMap.GetBaseShader());
           depthMapProgram.AttachShader(fragmentDepthMap.GetBaseShader());
           depthMapProgram.Compile();
+
+          tangentNormalProgram.AttachShader(vertexTangentNormal.GetBaseShader());
+          tangentNormalProgram.AttachShader(fragmentTangentNormal.GetBaseShader());
+          tangentNormalProgram.Compile();
       }
 
       CameraData cameraData;
@@ -231,6 +240,7 @@ int main(void) {
       lightProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       reflectionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       refractionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
+      tangentNormalProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
       globalSampler.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
@@ -477,6 +487,25 @@ int main(void) {
           lightProgram.SetVec3("uAlbedoFlatColor", glm::vec3(1.0,1.0,1.0));
           lightProgram.SetVec3("uLightColor", glm::vec3(1.0,1.0,1.0));
           lightMesh.Draw(lightProgram, globalSampler);
+
+          // NORMAL PLANE 
+          tangentNormalProgram.Bind();
+          glm::vec3 normalPlanePosition(-5.0f, 0.0f, -10.0f);
+          model = glm::translate(glm::mat4(1.0), normalPlanePosition);
+          model = glm::rotate(model, glm::radians(currentTime * -10.0f), glm::normalize(glm::vec3(0.0f, 1.0, 0.0f)));
+          tangentNormalProgram.SetMat4("model", model);
+          tangentNormalProgram.SetVec3("uLightPosition", lightPosition);
+          globalSampler.Bind(brickwallAlbedoTexture.GetUnit());
+          globalSampler.Bind(brickwallNormalTexture.GetUnit());
+          brickwallAlbedoTexture.Bind();
+          brickwallNormalTexture.Bind();
+          tangentNormalProgram.SetInt("diffuseMap", brickwallAlbedoTexture.GetUnit());
+          tangentNormalProgram.SetInt("normalMap", brickwallNormalTexture.GetUnit());
+          planeNormal.Draw(tangentNormalProgram);
+          glBindSampler(brickwallAlbedoTexture.GetUnit(), 1);
+          glBindSampler(brickwallNormalTexture.GetUnit(), 0);
+          brickwallAlbedoTexture.Unbind();
+          brickwallNormalTexture.Unbind();
 
           // SKYBOX
           glDepthFunc(GL_LEQUAL);

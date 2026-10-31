@@ -99,6 +99,8 @@ SET(PRIMITIVE
     "src/Engine/Primitive/Billboard.cpp"
     "src/Engine/Primitive/Quad.h"
     "src/Engine/Primitive/Quad.cpp"
+    "src/Engine/Primitive/Plane.h"
+    "src/Engine/Primitive/Plane.cpp"
 )
 
 SET(TEXTURE

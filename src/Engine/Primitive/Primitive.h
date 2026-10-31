@@ -6,3 +6,4 @@
 #include "Cube.h"
 #include "Billboard.h"
 #include "Quad.h"
+#include "Plane.h"
