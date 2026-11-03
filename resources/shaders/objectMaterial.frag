@@ -9,6 +9,9 @@
     #define MAX_SPOT_LIGHTS_CAPACITY 4
 #endif
 layout (location = 0) out vec4 FragColor;
+#ifdef USE_BLOOM
+layout (location = 1) out vec4 BrightColor;
+#endif
 
 in VS_OUT {
     vec3 FragPos;
@@ -133,6 +136,10 @@ void main() {
     for(int i = 0; i < MAX_SPOT_LIGHTS_CAPACITY && i < uNumSpotLights; i++) {
         result += GetSpotLight(uSpotLights[i], object);
     }
+#ifdef USE_BLOOM
+    float brightness = dot(result.rgb, vec3(0.2126, 0.7152, 0.0722));
+    BrightColor = vec4(result.rgb * step(1.0, brightness), 1.0);
+#endif
     FragColor = result;
 }
 

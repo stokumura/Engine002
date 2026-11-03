@@ -76,7 +76,7 @@ void ShaderProgram::AttachShader(const Shader &shader) {
         if(success) {
             attachments.push_back(shaderType);
         } else {
-            LOG("ERROR::SHADER_PROGRAM_ATTACHMENT failed of type: %s\n Shader attachment failed, shader was not valid or had erros", ShaderTypeToString(shaderType).c_str());
+            LOG("ERROR::SHADER_PROGRAM_ATTACHMENT failed of type: %s\n Shader attachment failed, shader was not valid or had errors", ShaderTypeToString(shaderType).c_str());
         }
     } else {
         LOG("ERROR::SHADER_PROGRAM_ATTACHMENT failed of type: %s\n Another shader of the same type has been already attached", ShaderTypeToString(shaderType).c_str());

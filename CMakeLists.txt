@@ -135,6 +135,10 @@ SET(MODERN_GRASS
 SET(RENDER_TEXTURE
     "src/Engine/RenderTexture/RenderTexture.h"
     "src/Engine/RenderTexture/RenderTexture.cpp"
+    "src/Engine/RenderTexture/PingPongTextures.h"
+    "src/Engine/RenderTexture/PingPongTextures.cpp"
+    "src/Engine/RenderTexture/DoubleRenderTexture.h"
+    "src/Engine/RenderTexture/DoubleRenderTexture.cpp"
 )
 
 SET(CUBEMAP

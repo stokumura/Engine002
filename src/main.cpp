@@ -42,22 +42,27 @@ float lastCursorY{HEIGHT / 2.0f};
 bool firstCursorClick{true};
 bool cursorInGame{false};
 
-glm::vec3 lightColorAmbient(0.05f, 0.05f, 0.05f);
-glm::vec3 lightColorDiffuse(0.8f, 0.8f, 0.8f);
-glm::vec3 lightColorSpecular(0.5f, 0.5f, 0.5f);
-glm::vec3 lightPosition(2.0f, 3.0f, -5.0f);
+glm::vec3 lightColorAmbientDir(0.5f, 0.5f, 0.5f);
+glm::vec3 lightColorDiffuseDir(3.0f, 3.0f, 3.0f);
+glm::vec3 lightColorSpecularDir(2.0f, 2.0f, 2.0f);
+glm::vec3 lightColorAmbientPoint(0.0f, 0.0f, 0.0f);
+glm::vec3 lightColorDiffusePoint(5.0f, 5.0f, 5.0f);
+glm::vec3 lightColorSpecularPoint(10.0f, 10.0f, 10.0f);
+glm::vec3 lightColorAmbientSpot(0.0f, 0.0f, 0.0f);
+glm::vec3 lightColorDiffuseSpot(2.0f, 2.0f, 2.0f);
+glm::vec3 lightColorSpecularSpot(1.0f, 1.0f, 1.0f);
+glm::vec3 lightPosition(0.0f, 5.0f, 0.0f);
 glm::vec3 lightDirection(-0.2f, -0.1f, -0.3f);
 
-float shininess = 16.0f;
+float shininess = 32.0f;
 float constantAttenuation = 1.0f;
-float linearAttenuation = 0.09f;
-float quadraticAttenuation = 0.032f;
-float cutOff = glm::cos(glm::radians(12.5f));
-float outerCutOff = glm::cos(glm::radians(17.5f));
+float linearAttenuation = 0.14f;
+float quadraticAttenuation = 0.07f;
+float cutOff = glm::cos(glm::radians(7.5f));
+float outerCutOff = glm::cos(glm::radians(12.5f));
 
-float heightScale = 0.1f;
-
-RenderTexture render;
+DoubleRenderTexture render;
+PingPongTextures pingPong;
 
 int main(void) {
   if (!glfwInit()) {
@@ -101,37 +106,30 @@ int main(void) {
   }
 
   {
-      render = RenderTexture(currentWidth, currentHeight, true);
-      ShadowCubemap shadowCubemap;
+      render = DoubleRenderTexture(currentWidth, currentHeight, true);
+      pingPong = PingPongTextures(currentWidth, currentHeight, true);
 
-      Sphere sphere(Vertex3DUnlit, 0.1f, 16, 16);
+      Sphere sphere(Vertex3DUnlit, 0.25f, 16, 16);
       Cube cube(Vertex3DLit, 1.0f, 16, 16, 16);
       Quad quad(Vertex2D);
       Cube skyboxCube({ VertexAttributeType::POSITION3D }, 2.0f, 1, 1, 1, true);
-      Billboard planeBillboard(Vertex3DLit, 1, 16, 16, 50.0f);
-      glm::quat normalPlaneRotation = glm::angleAxis(glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-      Plane planeNormalMap(Vertex3DLitFull, 16, 16, 5.0f, normalPlaneRotation);
+      glm::quat planeRotation = glm::angleAxis(glm::radians(90.0f), glm::vec3(1.0, 0.0, 0.0));
+      float planeLegnth = 50.0f;
+      Plane planeShape(Vertex3DLit, 16, 16, planeLegnth, planeRotation);
 
       const Mesh &mesh = cube.GetMesh();
       const Mesh &lightMesh = sphere.GetMesh();
       const Mesh &screen = quad.GetMesh();
       const Mesh &skybox = skyboxCube.GetMesh();
-      const Mesh &plane = planeBillboard.GetMesh();
-      const Mesh &planeNormal = planeNormalMap.GetMesh();
+      const Mesh &plane = planeShape.GetMesh();
 
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
       std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
       std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
       std::filesystem::path woodAlbedoTexturePath = texturesPath / "wood.png";
-      std::filesystem::path brickwallAlbedoTexturePath = texturesPath / "bricks2.jpg";
-      std::filesystem::path brickwallNormalTexturePath = texturesPath / "bricks2_normal.jpg";
-      std::filesystem::path brickwallDispTexturePath = texturesPath / "bricks2_disp.jpg";
       Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
       Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
       Texture woodAlbedoTexture(woodAlbedoTexturePath.string(), TextureType::DIFFUSE, 0);
-      Texture brickwallAlbedoTexture(brickwallAlbedoTexturePath.string(), TextureType::DIFFUSE, 0);
-      Texture brickwallNormalTexture(brickwallNormalTexturePath.string(), TextureType::NORMAL, 1);
-      Texture brickwallDispTexture(brickwallDispTexturePath.string(), TextureType::DISPLACEMENT, 2);
 
       std::filesystem::path skyboxTexturesParentPath = texturesPath / "skybox";
       std::vector<std::string> cubemapFaces { 
@@ -150,21 +148,15 @@ int main(void) {
 
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
-      std::filesystem::path fragmentShaderPath = shadersPath / "objectMaterialPointShadow.frag";
+      std::filesystem::path fragmentShaderPath = shadersPath / "objectMaterial.frag";
       std::filesystem::path vertexShaderLightPath = shadersPath / "objectFlatColor.vert";
       std::filesystem::path fragmentShaderLightPath = shadersPath / "objectFlatColor.frag";
       std::filesystem::path vertexShaderScreen = shadersPath / "screenQuad.vert";
       std::filesystem::path fragmentShaderScreen = shadersPath / "tonemapping.frag";
       std::filesystem::path vertexShaderSkybox = shadersPath / "skybox.vert";
       std::filesystem::path fragmentShaderSkybox = shadersPath / "skybox.frag";
-      std::filesystem::path fragmentShaderReflection = shadersPath / "objectReflect.frag";
-      std::filesystem::path fragmentShaderRefraction = shadersPath / "objectRefract.frag";
       std::filesystem::path vertexTiledShaderPath = shadersPath / "objectTiledMaterial.vert";
-      std::filesystem::path vertexShaderDepthMap = shadersPath / "simpleDepthCubemap.vert";
-      std::filesystem::path geometryShaderDepthMap = shadersPath / "simpleDepthCubemap.geom";
-      std::filesystem::path fragmentShaderDepthMap = shadersPath / "simpleDepthCubemap.frag";
-      std::filesystem::path vertexShaderTangentNormalMap = shadersPath / "objectTangentNormal.vert";
-      std::filesystem::path fragmentShaderTangentNormalMap = shadersPath / "objectTangentNormal.frag";
+      std::filesystem::path fragmentShaderGaussianBlur = shadersPath / "gaussianBlur.frag";
 
       ShaderProgram program;
       ShaderProgram modelProgram;
@@ -172,10 +164,7 @@ int main(void) {
       ShaderProgram lightProgram;
       ShaderProgram screenProgram;
       ShaderProgram skyboxProgram;
-      ShaderProgram reflectionProgram;
-      ShaderProgram refractionProgram;
-      ShaderProgram depthMapProgram;
-      ShaderProgram tangentNormalProgram;
+      ShaderProgram gaussianProgram;
       {
           ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
           ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
@@ -185,55 +174,36 @@ int main(void) {
           ShaderVariants fragmentScreen(fragmentShaderScreen.string(), ShaderType::FRAGMENT);
           ShaderVariants vertexSkybox(vertexShaderSkybox.string(), ShaderType::VERTEX);
           ShaderVariants fragmentSkybox(fragmentShaderSkybox.string(), ShaderType::FRAGMENT);
-          ShaderVariants fragmentReflection(fragmentShaderReflection.string(), ShaderType::FRAGMENT);
-          ShaderVariants fragmentRefraction(fragmentShaderRefraction.string(), ShaderType::FRAGMENT);
           ShaderVariants vertexTiled(vertexTiledShaderPath.string(), ShaderType::VERTEX);
-          ShaderVariants vertexDepthMap(vertexShaderDepthMap.string(), ShaderType::VERTEX);
-          ShaderVariants geometryDepthMap(geometryShaderDepthMap.string(), ShaderType::GEOMETRY);
-          ShaderVariants fragmentDepthMap(fragmentShaderDepthMap.string(), ShaderType::FRAGMENT);
-          ShaderVariants vertexTangentNormal(vertexShaderTangentNormalMap.string(), ShaderType::VERTEX);
-          ShaderVariants fragmentTangentNormal(fragmentShaderTangentNormalMap.string(), ShaderType::FRAGMENT);
+          ShaderVariants fragmentGaussianBlur(fragmentShaderGaussianBlur.string(), ShaderType::FRAGMENT);
 
           program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
-          program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
+          program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT", "USE_BLOOM" }));
           program.Compile();
 
           modelProgram.AttachShader(vertex.GetShader({ "USE_NORMAL_TEXTURE_MAP" }));
-          modelProgram.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_NORMAL_TEXTURE_MAP" , "USE_ALBEDO_AS_AMBIENT", "SPECULAR_IS_GRAY" }));
+          modelProgram.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_NORMAL_TEXTURE_MAP" , "USE_ALBEDO_AS_AMBIENT", "SPECULAR_IS_GRAY", "USE_BLOOM" }));
           modelProgram.Compile();
 
           floorProgram.AttachShader(vertexTiled.GetShader({ "USE_NORMAL_MATRIX" }));
-          floorProgram.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT" }));
+          floorProgram.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT", "USE_BLOOM" }));
           floorProgram.Compile();
 
           lightProgram.AttachShader(vertexLight.GetBaseShader());
-          lightProgram.AttachShader(fragmentLight.GetBaseShader());
+          lightProgram.AttachShader(fragmentLight.GetShader({ "USE_BLOOM" }));
           lightProgram.Compile();
 
           screenProgram.AttachShader(vertexScreen.GetBaseShader());
-          screenProgram.AttachShader(fragmentScreen.GetBaseShader());
+          screenProgram.AttachShader(fragmentScreen.GetShader({ "USE_BLOOM" }));
           screenProgram.Compile();
 
           skyboxProgram.AttachShader(vertexSkybox.GetBaseShader());
           skyboxProgram.AttachShader(fragmentSkybox.GetBaseShader());
           skyboxProgram.Compile();
 
-          reflectionProgram.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
-          reflectionProgram.AttachShader(fragmentReflection.GetBaseShader());
-          reflectionProgram.Compile();
-
-          refractionProgram.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
-          refractionProgram.AttachShader(fragmentRefraction.GetBaseShader());
-          refractionProgram.Compile();
-
-          depthMapProgram.AttachShader(vertexDepthMap.GetBaseShader());
-          depthMapProgram.AttachShader(geometryDepthMap.GetBaseShader());
-          depthMapProgram.AttachShader(fragmentDepthMap.GetBaseShader());
-          depthMapProgram.Compile();
-
-          tangentNormalProgram.AttachShader(vertexTangentNormal.GetBaseShader());
-          tangentNormalProgram.AttachShader(fragmentTangentNormal.GetShader({ "USE_PARALLAX_MAP", "USE_STEEP_PARALLAX_MAP" }));
-          tangentNormalProgram.Compile();
+          gaussianProgram.AttachShader(vertexScreen.GetBaseShader());
+          gaussianProgram.AttachShader(fragmentGaussianBlur.GetBaseShader());
+          gaussianProgram.Compile();
       }
 
       CameraData cameraData;
@@ -242,9 +212,6 @@ int main(void) {
       modelProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       floorProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       lightProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
-      reflectionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
-      refractionProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
-      tangentNormalProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
       globalSampler.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
@@ -283,206 +250,130 @@ int main(void) {
           cameraMatrices.UpdateData(&cameraData, sizeof(CameraData));
           cameraMatrices.Bind();
 
-          float speed = 25.0f;
-          float angleC = glm::radians(currentTime * speed);
-          float radiusC = 5.0f;
-          glm::vec3 translationB(-2.0f, -1.0f, -3.0f);
-          glm::vec3 translationC(radiusC * std::cos(angleC), 0.0f, radiusC * std::sin(angleC));
-          translationC += translationB;
-
-          // SHADOW MAP PASS
-          shadowCubemap.BindFBO();
-          glEnable(GL_DEPTH_TEST);
-          glCullFace(GL_FRONT);
-          glDisable(GL_FRAMEBUFFER_SRGB);
-          glClear(GL_DEPTH_BUFFER_BIT);
-          float aspect = (float)SHADOW_WIDTH/SHADOW_HEIGHT;
-          float near_plane = 1.0f;
-          float far_plane = 100.0f;
-          glm::mat4 shadowProjection = glm::perspective(glm::radians(90.0f), aspect, near_plane, far_plane);
-          std::vector<glm::mat4> shadowTransforms = {
-              shadowProjection * glm::lookAt(lightPosition, lightPosition + glm::vec3(1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)),
-              shadowProjection * glm::lookAt(lightPosition, lightPosition + glm::vec3(-1.0, 0.0, 0.0), glm::vec3(0.0, -1.0, 0.0)),
-              shadowProjection * glm::lookAt(lightPosition, lightPosition + glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 0.0, 1.0)),
-              shadowProjection * glm::lookAt(lightPosition, lightPosition + glm::vec3(0.0, -1.0, 0.0), glm::vec3(0.0, 0.0, -1.0)),
-              shadowProjection * glm::lookAt(lightPosition, lightPosition + glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, -1.0, 0.0)),
-              shadowProjection * glm::lookAt(lightPosition, lightPosition + glm::vec3(0.0, 0.0, -1.0), glm::vec3(0.0, -1.0, 0.0))
-          };
-          glm::mat4 lightView = glm::lookAt(lightPosition, glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-
-          depthMapProgram.Bind();
-          depthMapProgram.SetFloat("uFarPlane", far_plane);
-          depthMapProgram.SetVec3("uLightPosition", lightPosition);
-          for (unsigned int face = 0; face < 6; face++) {
-            char uniform_name[64];
-            snprintf(uniform_name, sizeof(uniform_name), "uShadowMatrices[%d]", face);
-            depthMapProgram.SetMat4(uniform_name, shadowTransforms[face]);
-          }
-          // CONTAINER - SHADOW
-          glm::mat4 model(1.0f);
-          model = glm::rotate(model, glm::radians(30.0f), glm::vec3(0.0, 1.0, 0.0));
-          model = glm::translate(model, translationC);
-          depthMapProgram.SetMat4("model", model);
-          mesh.Draw(depthMapProgram);
-          depthMapProgram.Bind();
-          // MODEL - SHADOW
-          model = glm::translate(glm::mat4(1.0f), translationB);
-          depthMapProgram.SetMat4("model", model);
-          backpack.Draw(depthMapProgram);
-          depthMapProgram.Bind();
-          // FLOOR - SHADOW
-          glCullFace(GL_BACK);
-          model = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0, 0.0, 0.0));
-          model = glm::translate(model, glm::vec3(0.0f, -25.0f, 5.0f));
-          depthMapProgram.SetMat4("model", model);
-          plane.Draw(depthMapProgram);
-          depthMapProgram.Bind();
-          glCullFace(GL_FRONT);
-          // ENVIRONMENT DYNAMIC - SHADOW
-          //model = glm::translate(glm::mat4(1.0), glm::vec3(-4.0, 0.0f, -1.0));
-          //depthMapProgram.SetMat4("model", model);
-          //mesh.Draw(depthMapProgram);
-          //depthMapProgram.Bind();
-          //model = glm::translate(glm::mat4(1.0), glm::vec3(2.0, 0.0f, -1.0));
-          //depthMapProgram.SetMat4("model", model);
-          //mesh.Draw(depthMapProgram);
-
-          shadowCubemap.UnbindFBO(currentWidth, currentHeight);
-          glCullFace(GL_BACK);
-
-
           // FIRST PASS
           render.BindFBO();
           glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
           glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
           glEnable(GL_DEPTH_TEST);
+          glDisable(GL_FRAMEBUFFER_SRGB);
 
           // CONTAINER
           program.Bind();
           program.SetFloat("uObjectMaterial.shininess", shininess);
           program.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
           program.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
-          program.SetInt("uShadowMap", 2);
-          program.SetFloat("uFarPlaneShadow", far_plane);
-          //program.SetMat4("uLightSpaceMatrix", lightSpaceMatrix);
-          //program.SetVec3("uDirLight.direction", lightDirection);
-          //program.SetVec3("uDirLight.ambient", lightColorAmbient);
-          //program.SetVec3("uDirLight.diffuse", lightColorDiffuse);
-          //program.SetVec3("uDirLight.specular", lightColorSpecular);
-          //program.SetInt("uNumPointLights", 1);
-          program.SetVec3("uPointLight.ambient", lightColorAmbient);
-          program.SetVec3("uPointLight.diffuse", lightColorDiffuse);
-          program.SetVec3("uPointLight.specular", lightColorSpecular);
-          program.SetVec3("uPointLight.position", lightPosition);
-          program.SetFloat("uPointLight.constant", constantAttenuation);
-          program.SetFloat("uPointLight.linear", linearAttenuation);
-          program.SetFloat("uPointLight.quadratic", quadraticAttenuation);
-          //program.SetInt("uNumSpotLights", 1);
-          //program.SetVec3("uSpotLights[0].position", camera.GetPosition());
-          //program.SetVec3("uSpotLights[0].direction", camera.GetFront());
-          //program.SetVec3("uSpotLights[0].ambient", lightColorAmbient);
-          //program.SetVec3("uSpotLights[0].diffuse", lightColorDiffuse);
-          //program.SetVec3("uSpotLights[0].specular", lightColorSpecular);
-          //program.SetFloat("uSpotLights[0].constant", constantAttenuation);
-          //program.SetFloat("uSpotLights[0].linear", linearAttenuation);
-          //program.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
-          //program.SetFloat("uSpotLights[0].cutOff", cutOff);
-          //program.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
+          program.SetInt("uNumDirLights", 1);
+          program.SetVec3("uDirLights[0].direction", lightDirection);
+          program.SetVec3("uDirLights[0].ambient", lightColorAmbientDir);
+          program.SetVec3("uDirLights[0].diffuse", lightColorDiffuseDir);
+          program.SetVec3("uDirLights[0].specular", lightColorSpecularDir);
+          program.SetInt("uNumPointLights", 1);
+          program.SetVec3("uPointLights[0].ambient", lightColorAmbientPoint);
+          program.SetVec3("uPointLights[0].diffuse", lightColorDiffusePoint);
+          program.SetVec3("uPointLights[0].specular", lightColorSpecularPoint);
+          program.SetVec3("uPointLights[0].position", lightPosition);
+          program.SetFloat("uPointLights[0].constant", constantAttenuation);
+          program.SetFloat("uPointLights[0].linear", linearAttenuation);
+          program.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
+          program.SetInt("uNumSpotLights", 1);
+          program.SetVec3("uSpotLights[0].position", camera.GetPosition());
+          program.SetVec3("uSpotLights[0].direction", camera.GetFront());
+          program.SetVec3("uSpotLights[0].ambient", lightColorAmbientSpot);
+          program.SetVec3("uSpotLights[0].diffuse", lightColorDiffuseSpot);
+          program.SetVec3("uSpotLights[0].specular", lightColorSpecularSpot);
+          program.SetFloat("uSpotLights[0].constant", constantAttenuation);
+          program.SetFloat("uSpotLights[0].linear", linearAttenuation);
+          program.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
+          program.SetFloat("uSpotLights[0].cutOff", cutOff);
+          program.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
 
           globalSampler.Bind(albedoTexture.GetUnit());
           albedoTexture.Bind();
           globalSampler.Bind(specularTexture.GetUnit());
           specularTexture.Bind();
-          glBindSampler(2, 0);
-          shadowCubemap.BindMap(2);
 
           glm::mat3 normal(1.0);
-          model = glm::rotate(glm::mat4(1.0), glm::radians(30.0f), glm::vec3(0.0, 1.0, 0.0));
-          model = glm::translate(model, translationC);
+          glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+          model = glm::rotate(glm::mat4(1.0), glm::radians(15.0f * currentTime), glm::vec3(1.0, 0.0, 1.0));
           normal = glm::mat3(glm::transpose(glm::inverse(model)));
           program.SetMat4("model", model);
           program.SetMat3("normal", normal);
           mesh.Draw(program, globalSampler);
           albedoTexture.Unbind();
           specularTexture.Unbind();
-          shadowCubemap.UnbindMap(2);
 
           // MODEL
           modelProgram.Bind();
           modelProgram.SetFloat("uObjectMaterial.shininess", shininess);
-          modelProgram.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
-          modelProgram.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
-          modelProgram.SetInt("uShadowMap", 3);
-          modelProgram.SetFloat("uFarPlaneShadow", far_plane);
-          modelProgram.SetVec3("uPointLight.diffuse", lightColorDiffuse);
-          modelProgram.SetVec3("uPointLight.ambient", lightColorAmbient);
-          modelProgram.SetVec3("uPointLight.specular", lightColorSpecular);
-          modelProgram.SetVec3("uPointLight.position", lightPosition);
-          modelProgram.SetFloat("uPointLight.constant", constantAttenuation);
-          modelProgram.SetFloat("uPointLight.linear", linearAttenuation);
-          modelProgram.SetFloat("uPointLight.quadratic", quadraticAttenuation);
-          glBindSampler(3, 0);
-          shadowCubemap.BindMap(3);
+          modelProgram.SetInt("uNumDirLights", 1);
+          modelProgram.SetVec3("uDirLights[0].direction", lightDirection);
+          modelProgram.SetVec3("uDirLights[0].ambient", lightColorAmbientDir);
+          modelProgram.SetVec3("uDirLights[0].diffuse", lightColorDiffuseDir);
+          modelProgram.SetVec3("uDirLights[0].specular", lightColorSpecularDir);
+          modelProgram.SetInt("uNumPointLights", 1);
+          modelProgram.SetVec3("uPointLights[0].ambient", lightColorAmbientPoint);
+          modelProgram.SetVec3("uPointLights[0].diffuse", lightColorDiffusePoint);
+          modelProgram.SetVec3("uPointLights[0].specular", lightColorSpecularPoint);
+          modelProgram.SetVec3("uPointLights[0].position", lightPosition);
+          modelProgram.SetFloat("uPointLights[0].constant", constantAttenuation);
+          modelProgram.SetFloat("uPointLights[0].linear", linearAttenuation);
+          modelProgram.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
+          modelProgram.SetInt("uNumSpotLights", 1);
+          modelProgram.SetVec3("uSpotLights[0].position", camera.GetPosition());
+          modelProgram.SetVec3("uSpotLights[0].direction", camera.GetFront());
+          modelProgram.SetVec3("uSpotLights[0].ambient", lightColorAmbientSpot);
+          modelProgram.SetVec3("uSpotLights[0].diffuse", lightColorDiffuseSpot);
+          modelProgram.SetVec3("uSpotLights[0].specular", lightColorSpecularSpot);
+          modelProgram.SetFloat("uSpotLights[0].constant", constantAttenuation);
+          modelProgram.SetFloat("uSpotLights[0].linear", linearAttenuation);
+          modelProgram.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
+          modelProgram.SetFloat("uSpotLights[0].cutOff", cutOff);
+          modelProgram.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
 
-          model = glm::translate(glm::mat4(1.0f), translationB);
+          model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0, -5.0f));
           normal = glm::mat3(glm::transpose(glm::inverse(model)));
           modelProgram.SetMat4("model", model);
           backpack.Draw(modelProgram, globalSampler);
-          shadowCubemap.UnbindMap(3);
 
           // FLOOR
           floorProgram.Bind();
           floorProgram.SetFloat("uObjectMaterial.shininess", shininess);
           floorProgram.SetInt("uObjectMaterial.diffuse1", woodAlbedoTexture.GetUnit());
           floorProgram.SetVec3("uObjectMaterial.specular", glm::vec3(0.8f, 0.8f, 0.8f));
-          floorProgram.SetInt("uShadowMap", 2);
-          floorProgram.SetFloat("uFarPlaneShadow", far_plane);
-          floorProgram.SetVec3("uPointLight.diffuse", lightColorDiffuse);
-          floorProgram.SetVec3("uPointLight.ambient", lightColorAmbient);
-          floorProgram.SetVec3("uPointLight.specular", lightColorSpecular);
-          floorProgram.SetVec3("uPointLight.position", lightPosition);
-          floorProgram.SetFloat("uPointLight.constant", constantAttenuation);
-          floorProgram.SetFloat("uPointLight.linear", linearAttenuation);
-          floorProgram.SetFloat("uPointLight.quadratic", quadraticAttenuation);
+          floorProgram.SetInt("uNumDirLights", 1);
+          floorProgram.SetVec3("uDirLights[0].direction", lightDirection);
+          floorProgram.SetVec3("uDirLights[0].ambient", lightColorAmbientDir);
+          floorProgram.SetVec3("uDirLights[0].diffuse", lightColorDiffuseDir);
+          floorProgram.SetVec3("uDirLights[0].specular", lightColorSpecularDir);
+          floorProgram.SetInt("uNumPointLights", 1);
+          floorProgram.SetVec3("uPointLights[0].ambient", lightColorAmbientPoint);
+          floorProgram.SetVec3("uPointLights[0].diffuse", lightColorDiffusePoint);
+          floorProgram.SetVec3("uPointLights[0].specular", lightColorSpecularPoint);
+          floorProgram.SetVec3("uPointLights[0].position", lightPosition);
+          floorProgram.SetFloat("uPointLights[0].constant", constantAttenuation);
+          floorProgram.SetFloat("uPointLights[0].linear", linearAttenuation);
+          floorProgram.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
+          floorProgram.SetInt("uNumSpotLights", 1);
+          floorProgram.SetVec3("uSpotLights[0].position", camera.GetPosition());
+          floorProgram.SetVec3("uSpotLights[0].direction", camera.GetFront());
+          floorProgram.SetVec3("uSpotLights[0].ambient", lightColorAmbientSpot);
+          floorProgram.SetVec3("uSpotLights[0].diffuse", lightColorDiffuseSpot);
+          floorProgram.SetVec3("uSpotLights[0].specular", lightColorSpecularSpot);
+          floorProgram.SetFloat("uSpotLights[0].constant", constantAttenuation);
+          floorProgram.SetFloat("uSpotLights[0].linear", linearAttenuation);
+          floorProgram.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
+          floorProgram.SetFloat("uSpotLights[0].cutOff", cutOff);
+          floorProgram.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
 
           globalSampler.Bind(woodAlbedoTexture.GetUnit());
           woodAlbedoTexture.Bind();
-          glBindSampler(2, 0);
-          shadowCubemap.BindMap(2);
 
-          model = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0, 0.0, 0.0));
-          model = glm::translate(model, glm::vec3(0.0f, -25.0f, 5.0f));
+          model = glm::translate(glm::mat4(1.0), glm::vec3(-planeLegnth / 2.0f, -2.0f, -planeLegnth / 2.0f));
           normal = glm::mat3(glm::transpose(glm::inverse(model)));
           floorProgram.SetMat4("model", model);
           floorProgram.SetMat3("normal", normal);
           plane.Draw(floorProgram);
           woodAlbedoTexture.Unbind();
-          shadowCubemap.UnbindMap(2);
-
-          // ENVIRONMENT DYNAMIC
-          //reflectionProgram.Bind();
-          //model = glm::translate(glm::mat4(1.0), glm::vec3(-4.0, 0.0f, -1.0));
-          //normal = glm::mat3(glm::transpose(glm::inverse(model)));
-          //reflectionProgram.SetMat4("model", model);
-          //reflectionProgram.SetMat3("normal", normal);
-          //glBindSampler(0, 0);
-          //cubemapTex.Bind(0);
-          //reflectionProgram.SetInt("uSkybox", 0);
-          //mesh.Draw(reflectionProgram);
-          //glBindTextureUnit(0, 0);
-
-          //refractionProgram.Bind();
-          //model = glm::translate(glm::mat4(1.0), glm::vec3(2.0, 0.0f, -1.0));
-          //normal = glm::mat3(glm::transpose(glm::inverse(model)));
-          //refractionProgram.SetMat4("model", model);
-          //refractionProgram.SetMat3("normal", normal);
-          //glBindSampler(0, 0);
-          //cubemapTex.Bind(0);
-          //refractionProgram.SetInt("uSkybox", 0);
-          //refractionProgram.SetFloat("uRefractionRatio", 1.0f / 1.52f);
-          //mesh.Draw(refractionProgram);
-          //glBindTextureUnit(0, 0);
-
 
           // LIGHT MESH
           model = glm::translate(glm::mat4(1.0), lightPosition);
@@ -491,31 +382,6 @@ int main(void) {
           lightProgram.SetVec3("uAlbedoFlatColor", glm::vec3(1.0,1.0,1.0));
           lightProgram.SetVec3("uLightColor", glm::vec3(1.0,1.0,1.0));
           lightMesh.Draw(lightProgram, globalSampler);
-
-          // NORMAL PLANE 
-          tangentNormalProgram.Bind();
-          glm::vec3 normalPlanePosition(-5.0f, 0.0f, -10.0f);
-          model = glm::translate(glm::mat4(1.0), normalPlanePosition);
-          model = glm::rotate(model, glm::radians(currentTime * -10.0f), glm::normalize(glm::vec3(0.0f, 1.0, 0.0f)));
-          tangentNormalProgram.SetMat4("model", model);
-          tangentNormalProgram.SetVec3("uLightPosition", lightPosition);
-          globalSampler.Bind(brickwallAlbedoTexture.GetUnit());
-          globalSampler.Bind(brickwallNormalTexture.GetUnit());
-          globalSampler.Bind(brickwallDispTexture.GetUnit());
-          brickwallAlbedoTexture.Bind();
-          brickwallNormalTexture.Bind();
-          brickwallDispTexture.Bind();
-          tangentNormalProgram.SetInt("diffuseMap", brickwallAlbedoTexture.GetUnit());
-          tangentNormalProgram.SetInt("normalMap", brickwallNormalTexture.GetUnit());
-          tangentNormalProgram.SetInt("depthMap", brickwallDispTexture.GetUnit());
-          tangentNormalProgram.SetFloat("uHeightScale", heightScale);
-          planeNormal.Draw(tangentNormalProgram);
-          glBindSampler(brickwallAlbedoTexture.GetUnit(), 0);
-          glBindSampler(brickwallNormalTexture.GetUnit(), 0);
-          glBindSampler(brickwallDispTexture.GetUnit(), 0);
-          brickwallAlbedoTexture.Unbind();
-          brickwallNormalTexture.Unbind();
-          brickwallDispTexture.Unbind();
 
           // SKYBOX
           glDepthFunc(GL_LEQUAL);
@@ -532,6 +398,26 @@ int main(void) {
           glBindTextureUnit(0, 0);
           glDepthFunc(GL_LESS);
 
+          //GAUSSIAN BLUR
+          bool horizontal = true, first_iteration = true;
+          int amount = 10;
+          gaussianProgram.Bind();
+          gaussianProgram.SetInt("uScreenTexture", 0);
+          glBindSampler(0, 0);
+          for(unsigned int i = 0; i < amount; i++) {
+              pingPong.BindFBO(horizontal);
+              gaussianProgram.SetInt("uHorizontal", horizontal);
+              if(first_iteration) {
+                  render.BindTexture(0, 1);
+              } else {
+                  pingPong.BindTexture(0, !horizontal);
+              }
+              screen.Draw(gaussianProgram);
+              gaussianProgram.Bind();
+              horizontal = !horizontal;
+              if(first_iteration) first_iteration = false;
+          }
+
           // SECOND PASS
           glBindFramebuffer(GL_FRAMEBUFFER, 0);
           glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -543,15 +429,20 @@ int main(void) {
           float minExposure = 0.1f;
           float maxExposure = 1.0f;
           float exposure = maxExposure * parameter + minExposure * (1.0f - parameter);
+          exposure = 1.0f;
 
           screenProgram.Bind();
           glBindSampler(0, 0);
+          glBindSampler(1, 0);
           screenProgram.SetInt("uScreenTexture", 0);
+          screenProgram.SetInt("uBloomBlur", 1);
           screenProgram.SetFloat("uExposure", exposure);
-          render.BindTexture(0);
+          render.BindTexture(0, 0);
+          pingPong.BindTexture(1, !horizontal);
           screen.Bind();
-          screen.Draw(screenProgram, globalSampler);
+          screen.Draw(screenProgram);
           glBindTextureUnit(0, 0);
+          glBindTextureUnit(1, 0);
 
           glfwSwapBuffers(window);
           glfwPollEvents();
@@ -596,7 +487,8 @@ void ProcessInput(GLFWwindow* window) {
 void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
     currentWidth = width;
     currentHeight = height;
-    render = RenderTexture(width, height, true);
+    render = DoubleRenderTexture(width, height, true);
+    pingPong = PingPongTextures(currentWidth, currentHeight, true);
     glViewport(0, 0, width, height);
 }
 
