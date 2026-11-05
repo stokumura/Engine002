@@ -17,6 +17,7 @@
 #include <string>
 
 #include "Engine/Engine.h"
+#include "Engine/Mesh/VertexAttribute.h"
 #include "Utils/Utils.h"
 
 const unsigned int samples {4};
@@ -44,6 +45,7 @@ float lastCursorY{HEIGHT / 2.0f};
 bool firstCursorClick{true};
 bool cursorInGame{false};
 
+RenderTexture render;
 GBuffer gBuffer;
 
 int main(void) {
@@ -88,12 +90,15 @@ int main(void) {
   }
 
   {
+      render = RenderTexture(currentWidth, currentHeight, true);
       gBuffer = GBuffer(currentWidth, currentHeight);
 
       Sphere sphereShape(Vertex3DUnlit, 0.25f, 16, 16);
+      Sphere sphereVolumeShape(Vertex3DUnlit, 1.0f, 32, 32);
       Quad quad(Vertex2D);
 
       const Mesh &sphere = sphereShape.GetMesh();
+      const Mesh &lightVolume = sphereVolumeShape.GetMesh();
       const Mesh &screen = quad.GetMesh();
 
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
@@ -132,14 +137,17 @@ int main(void) {
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
       std::filesystem::path vertexShaderPath = shadersPath / "objectGBuffer.vert";
       std::filesystem::path fragmentShaderPath = shadersPath / "objectGBuffer.frag";
-      std::filesystem::path vertexShaderScreen = shadersPath / "screenQuad.vert";
+      std::filesystem::path vertexShaderScreen = shadersPath / "lightVolume.vert";
       std::filesystem::path fragmentShaderDeferred = shadersPath / "deferredLighting.frag";
       std::filesystem::path vertexShaderLightPath = shadersPath / "objectFlatColor.vert";
       std::filesystem::path fragmentShaderLightPath = shadersPath / "objectFlatColor.frag";
+      std::filesystem::path vertexShaderScreenQuad = shadersPath / "screenQuad.vert";
+      std::filesystem::path fragmentShaderScreen = shadersPath / "tonemapping.frag";
 
       ShaderProgram program;
       ShaderProgram deferredProgram;
       ShaderProgram lightProgram;
+      ShaderProgram screenProgram;
       {
           ShaderVariants vertexGBuffer(vertexShaderPath.string(), ShaderType::VERTEX);
           ShaderVariants fragmentGBuffer(fragmentShaderPath.string(), ShaderType::FRAGMENT);
@@ -147,6 +155,8 @@ int main(void) {
           ShaderVariants fragmentDeferred(fragmentShaderDeferred.string(), ShaderType::FRAGMENT);
           ShaderVariants vertexLight(vertexShaderLightPath.string(), ShaderType::VERTEX);
           ShaderVariants fragmentLight(fragmentShaderLightPath.string(), ShaderType::FRAGMENT);
+          ShaderVariants vertexScreenQuad(vertexShaderScreenQuad.string(), ShaderType::VERTEX);
+          ShaderVariants fragmentScreen(fragmentShaderScreen.string(), ShaderType::FRAGMENT);
 
           program.AttachShader(vertexGBuffer.GetBaseShader());
           program.AttachShader(fragmentGBuffer.GetBaseShader());
@@ -159,11 +169,16 @@ int main(void) {
           lightProgram.AttachShader(vertexLight.GetBaseShader());
           lightProgram.AttachShader(fragmentLight.GetBaseShader());
           lightProgram.Compile();
+
+          screenProgram.AttachShader(vertexScreenQuad.GetBaseShader());
+          screenProgram.AttachShader(fragmentScreen.GetBaseShader());
+          screenProgram.Compile();
       }
 
       CameraData cameraData;
       UniformBlock cameraMatrices("CameraData", 2, sizeof(CameraData), &cameraData);
       program.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
+      deferredProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       lightProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
@@ -209,7 +224,7 @@ int main(void) {
 
           // GEOMETRY PASS
           gBuffer.BindFBO();
-          glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+          glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
           glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
           glEnable(GL_DEPTH_TEST);
           glDisable(GL_FRAMEBUFFER_SRGB);
@@ -224,43 +239,52 @@ int main(void) {
           }
 
           // LIGHTING PASS
-          glBindFramebuffer(GL_FRAMEBUFFER, 0);
-          glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          render.BindFBO();
+          glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+          glClear(GL_COLOR_BUFFER_BIT);
           glDisable(GL_DEPTH_TEST);
-          glEnable(GL_FRAMEBUFFER_SRGB);
+          glCullFace(GL_FRONT);
+          glEnable(GL_BLEND);
+          glBlendEquation(GL_FUNC_ADD);
+          glBlendFuncSeparate(GL_ONE, GL_ONE, GL_ONE, GL_ZERO);
 
           deferredProgram.Bind();
-          deferredProgram.SetVec3("viewPosition", cameraData.viewPosition);
-          for (unsigned int i = 0; i < lightPositions.size(); i++) {
-              deferredProgram.SetVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
-              deferredProgram.SetVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
-
-              const float constant = 1.0f;
-              const float linear = 0.7f;
-              const float quadratic = 1.8f;
-              deferredProgram.SetFloat("lights[" + std::to_string(i) + "].Linear", linear);
-              deferredProgram.SetFloat("lights[" + std::to_string(i) + "].Quadratic", quadratic);
-
-              const float maxBrightness = std::fmaxf(std::fmaxf(lightColors[i].r, lightColors[i].g), lightColors[i].b);
-              float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f/5.0f) * maxBrightness))) / (2.0f * quadratic);
-              deferredProgram.SetFloat("lights[" + std::to_string(i) + "].Radius", radius);
-          }
           glBindSampler(0, 0);
           glBindSampler(1, 0);
           glBindSampler(2, 0);
           gBuffer.BindTexture(0, 0);
           gBuffer.BindTexture(1, 1);
           gBuffer.BindTexture(2, 2);
-          screen.Bind();
-          screen.Draw(deferredProgram);
+          for (unsigned int i = 0; i < lightPositions.size(); i++) {
+              deferredProgram.SetVec3("light.Position", lightPositions[i]);
+              deferredProgram.SetVec3("light.Color", lightColors[i]);
+
+              const float constant = 1.0f;
+              const float linear = 0.7f;
+              const float quadratic = 1.8f;
+              deferredProgram.SetFloat("light.Linear", linear);
+              deferredProgram.SetFloat("light.Quadratic", quadratic);
+
+              const float maxBrightness = std::fmaxf(std::fmaxf(lightColors[i].r, lightColors[i].g), lightColors[i].b);
+              float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f/5.0f) * maxBrightness))) / (2.0f * quadratic);
+
+              model = glm::mat4(1.0f);
+              model = glm::translate(model, lightPositions[i]);
+              model = glm::scale(model, glm::vec3(radius));
+              deferredProgram.SetMat4("model", model);
+
+              lightVolume.Bind();
+              lightVolume.Draw(deferredProgram);
+          }
           glBindTextureUnit(0, 0);
           glBindTextureUnit(1, 0);
           glBindTextureUnit(2, 0);
 
-          glBlitNamedFramebuffer(gBuffer.GetFBO(), 0, 0, 0, currentWidth, currentHeight, 0, 0, currentWidth, currentHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+          glBlitNamedFramebuffer(gBuffer.GetFBO(), render.GetFBO(), 0, 0, currentWidth, currentHeight, 0, 0, currentWidth, currentHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
 
           // FORWARD RENDERING
+          glDisable(GL_BLEND);
+          glCullFace(GL_BACK);
           glEnable(GL_DEPTH_TEST);
           lightProgram.Bind();
           for (unsigned int i = 0; i < lightPositions.size(); i++) {
@@ -272,6 +296,24 @@ int main(void) {
               lightProgram.SetVec3("uLightColor", lightColors[i]);
               sphere.Draw(lightProgram);
           }
+
+          // TONEMAPPING
+          glBindFramebuffer(GL_FRAMEBUFFER, 0);
+          glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+          glClear(GL_COLOR_BUFFER_BIT);
+          glDisable(GL_DEPTH_TEST);
+          glEnable(GL_FRAMEBUFFER_SRGB);
+
+          float exposure = 0.4f;
+
+          screenProgram.Bind();
+          glBindSampler(0, 0);
+          screenProgram.SetInt("uScreenTexture", 0);
+          screenProgram.SetFloat("uExposure", exposure);
+          render.BindTexture(0);
+          screen.Bind();
+          screen.Draw(screenProgram);
+          glBindTextureUnit(0, 0);
 
           glfwSwapBuffers(window);
           glfwPollEvents();
@@ -316,6 +358,7 @@ void ProcessInput(GLFWwindow* window) {
 void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
     currentWidth = width;
     currentHeight = height;
+    render = RenderTexture(currentWidth, currentHeight, true);
     gBuffer = GBuffer(currentWidth, currentHeight);
     glViewport(0, 0, width, height);
 }

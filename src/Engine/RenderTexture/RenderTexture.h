@@ -25,6 +25,7 @@ class RenderTexture {
 
         void Blit(GLuint targetFBO, int offsetX = 0, int offsetY = 0) const;
 
+        GLuint GetFBO() const { return FBO; }
     private:
         void SetupAttachments();
         void CheckAttachments() const;
