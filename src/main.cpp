@@ -8,11 +8,13 @@
 
 #include <cmath>
 #include <cstdio>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_trigonometric.hpp>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <filesystem>
 #include <iostream>
+#include <string>
 
 #include "Engine/Engine.h"
 #include "Utils/Utils.h"
@@ -42,27 +44,7 @@ float lastCursorY{HEIGHT / 2.0f};
 bool firstCursorClick{true};
 bool cursorInGame{false};
 
-glm::vec3 lightColorAmbientDir(0.5f, 0.5f, 0.5f);
-glm::vec3 lightColorDiffuseDir(3.0f, 3.0f, 3.0f);
-glm::vec3 lightColorSpecularDir(2.0f, 2.0f, 2.0f);
-glm::vec3 lightColorAmbientPoint(0.0f, 0.0f, 0.0f);
-glm::vec3 lightColorDiffusePoint(5.0f, 5.0f, 5.0f);
-glm::vec3 lightColorSpecularPoint(10.0f, 10.0f, 10.0f);
-glm::vec3 lightColorAmbientSpot(0.0f, 0.0f, 0.0f);
-glm::vec3 lightColorDiffuseSpot(2.0f, 2.0f, 2.0f);
-glm::vec3 lightColorSpecularSpot(1.0f, 1.0f, 1.0f);
-glm::vec3 lightPosition(0.0f, 5.0f, 0.0f);
-glm::vec3 lightDirection(-0.2f, -0.1f, -0.3f);
-
-float shininess = 32.0f;
-float constantAttenuation = 1.0f;
-float linearAttenuation = 0.14f;
-float quadraticAttenuation = 0.07f;
-float cutOff = glm::cos(glm::radians(7.5f));
-float outerCutOff = glm::cos(glm::radians(12.5f));
-
-DoubleRenderTexture render;
-PingPongTextures pingPong;
+GBuffer gBuffer;
 
 int main(void) {
   if (!glfwInit()) {
@@ -106,117 +88,87 @@ int main(void) {
   }
 
   {
-      render = DoubleRenderTexture(currentWidth, currentHeight, true);
-      pingPong = PingPongTextures(currentWidth, currentHeight, true);
+      gBuffer = GBuffer(currentWidth, currentHeight);
 
-      Sphere sphere(Vertex3DUnlit, 0.25f, 16, 16);
-      Cube cube(Vertex3DLit, 1.0f, 16, 16, 16);
+      Sphere sphereShape(Vertex3DUnlit, 0.25f, 16, 16);
       Quad quad(Vertex2D);
-      Cube skyboxCube({ VertexAttributeType::POSITION3D }, 2.0f, 1, 1, 1, true);
-      glm::quat planeRotation = glm::angleAxis(glm::radians(90.0f), glm::vec3(1.0, 0.0, 0.0));
-      float planeLegnth = 50.0f;
-      Plane planeShape(Vertex3DLit, 16, 16, planeLegnth, planeRotation);
 
-      const Mesh &mesh = cube.GetMesh();
-      const Mesh &lightMesh = sphere.GetMesh();
+      const Mesh &sphere = sphereShape.GetMesh();
       const Mesh &screen = quad.GetMesh();
-      const Mesh &skybox = skyboxCube.GetMesh();
-      const Mesh &plane = planeShape.GetMesh();
 
       std::filesystem::path texturesPath = GetResourcesPath() / "textures";
-      std::filesystem::path albedoTexturePath = texturesPath / "container2.png";
-      std::filesystem::path specularTexturePath = texturesPath / "container2_specular.png";
-      std::filesystem::path woodAlbedoTexturePath = texturesPath / "wood.png";
-      Texture albedoTexture(albedoTexturePath.string(), TextureType::DIFFUSE, 0);
-      Texture specularTexture(specularTexturePath.string(), TextureType::SPECULAR, 1);
-      Texture woodAlbedoTexture(woodAlbedoTexturePath.string(), TextureType::DIFFUSE, 0);
-
-      std::filesystem::path skyboxTexturesParentPath = texturesPath / "skybox";
-      std::vector<std::string> cubemapFaces { 
-          "right.jpg",
-          "left.jpg",
-          "top.jpg",
-          "bottom.jpg",
-          "front.jpg",
-          "back.jpg"
-      };
-      Cubemap cubemapTex(skyboxTexturesParentPath, cubemapFaces);
 
       std::filesystem::path modelsPath = GetResourcesPath() / "objects";
       std::filesystem::path backpackPath = modelsPath / "backpack" / "backpack.obj";
-      Model backpack(Vertex3DLit, backpackPath);
+      Model backpack(Vertex3DLitFull, backpackPath);
+      std::vector<glm::vec3> objectPositions {
+          glm::vec3(-3.0f, -0.5f, -3.0f),
+          glm::vec3(0.0f, -0.5f, -3.0f),
+          glm::vec3(3.0f, -0.5f, -3.0f),
+          glm::vec3(-3.0f, -0.5f, 0.0f),
+          glm::vec3(0.0f, -0.5f, 0.0f),
+          glm::vec3(3.0f, -0.5f, 0.0f),
+          glm::vec3(-3.0f, -0.5f, 3.0f),
+          glm::vec3(0.0f, -0.5f, 3.0f),
+          glm::vec3(3.0f, -0.5f, 3.0f),
+      };
+
+      const unsigned int NR_LIGHTS = 32;
+      std::vector<glm::vec3> lightPositions;
+      std::vector<glm::vec3> lightColors;
+      std::srand(13);
+      for(unsigned int i = 0; i < NR_LIGHTS; i++) {
+          float xPos = static_cast<float>(((std::rand() % 100) / 100.0f) * 6.0f - 3.0f);
+          float yPos = static_cast<float>(((std::rand() % 100) / 100.0f) * 6.0f - 4.0f);
+          float zPos = static_cast<float>(((std::rand() % 100) / 100.0f) * 6.0f - 3.0f);
+          lightPositions.push_back(glm::vec3(xPos, yPos, zPos));
+
+          float rColor = static_cast<float>(((std::rand() % 100) / 200.0f) + 0.5f);
+          float gColor = static_cast<float>(((std::rand() % 100) / 200.0f) + 0.5f);
+          float bColor = static_cast<float>(((std::rand() % 100) / 200.0f) + 0.5f);
+          lightColors.push_back(glm::vec3(rColor, bColor, gColor));
+      }
 
       std::filesystem::path shadersPath = GetResourcesPath() / "shaders";
-      std::filesystem::path vertexShaderPath = shadersPath / "objectMaterial.vert";
-      std::filesystem::path fragmentShaderPath = shadersPath / "objectMaterial.frag";
+      std::filesystem::path vertexShaderPath = shadersPath / "objectGBuffer.vert";
+      std::filesystem::path fragmentShaderPath = shadersPath / "objectGBuffer.frag";
+      std::filesystem::path vertexShaderScreen = shadersPath / "screenQuad.vert";
+      std::filesystem::path fragmentShaderDeferred = shadersPath / "deferredLighting.frag";
       std::filesystem::path vertexShaderLightPath = shadersPath / "objectFlatColor.vert";
       std::filesystem::path fragmentShaderLightPath = shadersPath / "objectFlatColor.frag";
-      std::filesystem::path vertexShaderScreen = shadersPath / "screenQuad.vert";
-      std::filesystem::path fragmentShaderScreen = shadersPath / "tonemapping.frag";
-      std::filesystem::path vertexShaderSkybox = shadersPath / "skybox.vert";
-      std::filesystem::path fragmentShaderSkybox = shadersPath / "skybox.frag";
-      std::filesystem::path vertexTiledShaderPath = shadersPath / "objectTiledMaterial.vert";
-      std::filesystem::path fragmentShaderGaussianBlur = shadersPath / "gaussianBlur.frag";
 
       ShaderProgram program;
-      ShaderProgram modelProgram;
-      ShaderProgram floorProgram;
+      ShaderProgram deferredProgram;
       ShaderProgram lightProgram;
-      ShaderProgram screenProgram;
-      ShaderProgram skyboxProgram;
-      ShaderProgram gaussianProgram;
       {
-          ShaderVariants vertex(vertexShaderPath.string(), ShaderType::VERTEX);
-          ShaderVariants fragment(fragmentShaderPath.string(), ShaderType::FRAGMENT);
+          ShaderVariants vertexGBuffer(vertexShaderPath.string(), ShaderType::VERTEX);
+          ShaderVariants fragmentGBuffer(fragmentShaderPath.string(), ShaderType::FRAGMENT);
+          ShaderVariants vertexScreen(vertexShaderScreen.string(), ShaderType::VERTEX);
+          ShaderVariants fragmentDeferred(fragmentShaderDeferred.string(), ShaderType::FRAGMENT);
           ShaderVariants vertexLight(vertexShaderLightPath.string(), ShaderType::VERTEX);
           ShaderVariants fragmentLight(fragmentShaderLightPath.string(), ShaderType::FRAGMENT);
-          ShaderVariants vertexScreen(vertexShaderScreen.string(), ShaderType::VERTEX);
-          ShaderVariants fragmentScreen(fragmentShaderScreen.string(), ShaderType::FRAGMENT);
-          ShaderVariants vertexSkybox(vertexShaderSkybox.string(), ShaderType::VERTEX);
-          ShaderVariants fragmentSkybox(fragmentShaderSkybox.string(), ShaderType::FRAGMENT);
-          ShaderVariants vertexTiled(vertexTiledShaderPath.string(), ShaderType::VERTEX);
-          ShaderVariants fragmentGaussianBlur(fragmentShaderGaussianBlur.string(), ShaderType::FRAGMENT);
 
-          program.AttachShader(vertex.GetShader({ "USE_NORMAL_MATRIX" }));
-          program.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT", "USE_BLOOM" }));
+          program.AttachShader(vertexGBuffer.GetBaseShader());
+          program.AttachShader(fragmentGBuffer.GetBaseShader());
           program.Compile();
 
-          modelProgram.AttachShader(vertex.GetShader({ "USE_NORMAL_TEXTURE_MAP" }));
-          modelProgram.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_SPECULAR_TEXTURE_MAP", "USE_NORMAL_TEXTURE_MAP" , "USE_ALBEDO_AS_AMBIENT", "SPECULAR_IS_GRAY", "USE_BLOOM" }));
-          modelProgram.Compile();
-
-          floorProgram.AttachShader(vertexTiled.GetShader({ "USE_NORMAL_MATRIX" }));
-          floorProgram.AttachShader(fragment.GetShader({ "USE_ALBEDO_TEXTURE_MAP", "USE_ALBEDO_AS_AMBIENT", "USE_BLOOM" }));
-          floorProgram.Compile();
+          deferredProgram.AttachShader(vertexScreen.GetBaseShader());
+          deferredProgram.AttachShader(fragmentDeferred.GetBaseShader());
+          deferredProgram.Compile();
 
           lightProgram.AttachShader(vertexLight.GetBaseShader());
-          lightProgram.AttachShader(fragmentLight.GetShader({ "USE_BLOOM" }));
+          lightProgram.AttachShader(fragmentLight.GetBaseShader());
           lightProgram.Compile();
-
-          screenProgram.AttachShader(vertexScreen.GetBaseShader());
-          screenProgram.AttachShader(fragmentScreen.GetShader({ "USE_BLOOM" }));
-          screenProgram.Compile();
-
-          skyboxProgram.AttachShader(vertexSkybox.GetBaseShader());
-          skyboxProgram.AttachShader(fragmentSkybox.GetBaseShader());
-          skyboxProgram.Compile();
-
-          gaussianProgram.AttachShader(vertexScreen.GetBaseShader());
-          gaussianProgram.AttachShader(fragmentGaussianBlur.GetBaseShader());
-          gaussianProgram.Compile();
       }
 
       CameraData cameraData;
       UniformBlock cameraMatrices("CameraData", 2, sizeof(CameraData), &cameraData);
       program.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
-      modelProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
-      floorProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
       lightProgram.BindUniformBlock(cameraMatrices.GetBindingPoint(), cameraMatrices.GetName());
 
       Sampler globalSampler;
       globalSampler.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
       globalSampler.SetMagFilter(GL_LINEAR);
-
       globalSampler.SetWrapS(GL_CLAMP_TO_EDGE);
       globalSampler.SetWrapT(GL_CLAMP_TO_EDGE);
 
@@ -235,6 +187,11 @@ int main(void) {
       //Uncomment for drawing as wireframe
       //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+      deferredProgram.Bind();
+      deferredProgram.SetInt("gPosition", 0);
+      deferredProgram.SetInt("gNormal", 1);
+      deferredProgram.SetInt("gAlbedoSpec", 2);
+
       while (!glfwWindowShouldClose(window)) {
           float currentTime = static_cast<float>(glfwGetTime());
           deltaTime = currentTime - lastTime;
@@ -250,199 +207,71 @@ int main(void) {
           cameraMatrices.UpdateData(&cameraData, sizeof(CameraData));
           cameraMatrices.Bind();
 
-          // FIRST PASS
-          render.BindFBO();
+          // GEOMETRY PASS
+          gBuffer.BindFBO();
           glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
           glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
           glEnable(GL_DEPTH_TEST);
           glDisable(GL_FRAMEBUFFER_SRGB);
-
-          // CONTAINER
           program.Bind();
-          program.SetFloat("uObjectMaterial.shininess", shininess);
-          program.SetInt("uObjectMaterial.diffuse1", albedoTexture.GetUnit());
-          program.SetInt("uObjectMaterial.specular1", specularTexture.GetUnit());
-          program.SetInt("uNumDirLights", 1);
-          program.SetVec3("uDirLights[0].direction", lightDirection);
-          program.SetVec3("uDirLights[0].ambient", lightColorAmbientDir);
-          program.SetVec3("uDirLights[0].diffuse", lightColorDiffuseDir);
-          program.SetVec3("uDirLights[0].specular", lightColorSpecularDir);
-          program.SetInt("uNumPointLights", 1);
-          program.SetVec3("uPointLights[0].ambient", lightColorAmbientPoint);
-          program.SetVec3("uPointLights[0].diffuse", lightColorDiffusePoint);
-          program.SetVec3("uPointLights[0].specular", lightColorSpecularPoint);
-          program.SetVec3("uPointLights[0].position", lightPosition);
-          program.SetFloat("uPointLights[0].constant", constantAttenuation);
-          program.SetFloat("uPointLights[0].linear", linearAttenuation);
-          program.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
-          program.SetInt("uNumSpotLights", 1);
-          program.SetVec3("uSpotLights[0].position", camera.GetPosition());
-          program.SetVec3("uSpotLights[0].direction", camera.GetFront());
-          program.SetVec3("uSpotLights[0].ambient", lightColorAmbientSpot);
-          program.SetVec3("uSpotLights[0].diffuse", lightColorDiffuseSpot);
-          program.SetVec3("uSpotLights[0].specular", lightColorSpecularSpot);
-          program.SetFloat("uSpotLights[0].constant", constantAttenuation);
-          program.SetFloat("uSpotLights[0].linear", linearAttenuation);
-          program.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
-          program.SetFloat("uSpotLights[0].cutOff", cutOff);
-          program.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
-
-          globalSampler.Bind(albedoTexture.GetUnit());
-          albedoTexture.Bind();
-          globalSampler.Bind(specularTexture.GetUnit());
-          specularTexture.Bind();
-
-          glm::mat3 normal(1.0);
-          glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
-          model = glm::rotate(glm::mat4(1.0), glm::radians(15.0f * currentTime), glm::vec3(1.0, 0.0, 1.0));
-          normal = glm::mat3(glm::transpose(glm::inverse(model)));
-          program.SetMat4("model", model);
-          program.SetMat3("normal", normal);
-          mesh.Draw(program, globalSampler);
-          albedoTexture.Unbind();
-          specularTexture.Unbind();
-
-          // MODEL
-          modelProgram.Bind();
-          modelProgram.SetFloat("uObjectMaterial.shininess", shininess);
-          modelProgram.SetInt("uNumDirLights", 1);
-          modelProgram.SetVec3("uDirLights[0].direction", lightDirection);
-          modelProgram.SetVec3("uDirLights[0].ambient", lightColorAmbientDir);
-          modelProgram.SetVec3("uDirLights[0].diffuse", lightColorDiffuseDir);
-          modelProgram.SetVec3("uDirLights[0].specular", lightColorSpecularDir);
-          modelProgram.SetInt("uNumPointLights", 1);
-          modelProgram.SetVec3("uPointLights[0].ambient", lightColorAmbientPoint);
-          modelProgram.SetVec3("uPointLights[0].diffuse", lightColorDiffusePoint);
-          modelProgram.SetVec3("uPointLights[0].specular", lightColorSpecularPoint);
-          modelProgram.SetVec3("uPointLights[0].position", lightPosition);
-          modelProgram.SetFloat("uPointLights[0].constant", constantAttenuation);
-          modelProgram.SetFloat("uPointLights[0].linear", linearAttenuation);
-          modelProgram.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
-          modelProgram.SetInt("uNumSpotLights", 1);
-          modelProgram.SetVec3("uSpotLights[0].position", camera.GetPosition());
-          modelProgram.SetVec3("uSpotLights[0].direction", camera.GetFront());
-          modelProgram.SetVec3("uSpotLights[0].ambient", lightColorAmbientSpot);
-          modelProgram.SetVec3("uSpotLights[0].diffuse", lightColorDiffuseSpot);
-          modelProgram.SetVec3("uSpotLights[0].specular", lightColorSpecularSpot);
-          modelProgram.SetFloat("uSpotLights[0].constant", constantAttenuation);
-          modelProgram.SetFloat("uSpotLights[0].linear", linearAttenuation);
-          modelProgram.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
-          modelProgram.SetFloat("uSpotLights[0].cutOff", cutOff);
-          modelProgram.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
-
-          model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0, 0.0, -5.0f));
-          normal = glm::mat3(glm::transpose(glm::inverse(model)));
-          modelProgram.SetMat4("model", model);
-          backpack.Draw(modelProgram, globalSampler);
-
-          // FLOOR
-          floorProgram.Bind();
-          floorProgram.SetFloat("uObjectMaterial.shininess", shininess);
-          floorProgram.SetInt("uObjectMaterial.diffuse1", woodAlbedoTexture.GetUnit());
-          floorProgram.SetVec3("uObjectMaterial.specular", glm::vec3(0.8f, 0.8f, 0.8f));
-          floorProgram.SetInt("uNumDirLights", 1);
-          floorProgram.SetVec3("uDirLights[0].direction", lightDirection);
-          floorProgram.SetVec3("uDirLights[0].ambient", lightColorAmbientDir);
-          floorProgram.SetVec3("uDirLights[0].diffuse", lightColorDiffuseDir);
-          floorProgram.SetVec3("uDirLights[0].specular", lightColorSpecularDir);
-          floorProgram.SetInt("uNumPointLights", 1);
-          floorProgram.SetVec3("uPointLights[0].ambient", lightColorAmbientPoint);
-          floorProgram.SetVec3("uPointLights[0].diffuse", lightColorDiffusePoint);
-          floorProgram.SetVec3("uPointLights[0].specular", lightColorSpecularPoint);
-          floorProgram.SetVec3("uPointLights[0].position", lightPosition);
-          floorProgram.SetFloat("uPointLights[0].constant", constantAttenuation);
-          floorProgram.SetFloat("uPointLights[0].linear", linearAttenuation);
-          floorProgram.SetFloat("uPointLights[0].quadratic", quadraticAttenuation);
-          floorProgram.SetInt("uNumSpotLights", 1);
-          floorProgram.SetVec3("uSpotLights[0].position", camera.GetPosition());
-          floorProgram.SetVec3("uSpotLights[0].direction", camera.GetFront());
-          floorProgram.SetVec3("uSpotLights[0].ambient", lightColorAmbientSpot);
-          floorProgram.SetVec3("uSpotLights[0].diffuse", lightColorDiffuseSpot);
-          floorProgram.SetVec3("uSpotLights[0].specular", lightColorSpecularSpot);
-          floorProgram.SetFloat("uSpotLights[0].constant", constantAttenuation);
-          floorProgram.SetFloat("uSpotLights[0].linear", linearAttenuation);
-          floorProgram.SetFloat("uSpotLights[0].quadratic", quadraticAttenuation);
-          floorProgram.SetFloat("uSpotLights[0].cutOff", cutOff);
-          floorProgram.SetFloat("uSpotLights[0].outerCutOff", outerCutOff);
-
-          globalSampler.Bind(woodAlbedoTexture.GetUnit());
-          woodAlbedoTexture.Bind();
-
-          model = glm::translate(glm::mat4(1.0), glm::vec3(-planeLegnth / 2.0f, -2.0f, -planeLegnth / 2.0f));
-          normal = glm::mat3(glm::transpose(glm::inverse(model)));
-          floorProgram.SetMat4("model", model);
-          floorProgram.SetMat3("normal", normal);
-          plane.Draw(floorProgram);
-          woodAlbedoTexture.Unbind();
-
-          // LIGHT MESH
-          model = glm::translate(glm::mat4(1.0), lightPosition);
-          lightProgram.Bind();
-          lightProgram.SetMat4("model", model);
-          lightProgram.SetVec3("uAlbedoFlatColor", glm::vec3(1.0,1.0,1.0));
-          lightProgram.SetVec3("uLightColor", glm::vec3(1.0,1.0,1.0));
-          lightMesh.Draw(lightProgram, globalSampler);
-
-          // SKYBOX
-          glDepthFunc(GL_LEQUAL);
-          skyboxProgram.Bind();
-          glBindSampler(0, 0);
-          skyboxProgram.SetInt("uSkybox", 0);
-          skyboxProgram.SetMat4("uProjection", cameraData.projection);
-          glm::mat4 noTranslationViewMatrix = glm::mat4(glm::mat3(cameraData.view));
-          skyboxProgram.SetMat4("uView", noTranslationViewMatrix);
-          cubemapTex.Bind(0);
-          skybox.Bind();
-          skybox.Draw(skyboxProgram);
-          skybox.Unbind();
-          glBindTextureUnit(0, 0);
-          glDepthFunc(GL_LESS);
-
-          //GAUSSIAN BLUR
-          bool horizontal = true, first_iteration = true;
-          int amount = 10;
-          gaussianProgram.Bind();
-          gaussianProgram.SetInt("uScreenTexture", 0);
-          glBindSampler(0, 0);
-          for(unsigned int i = 0; i < amount; i++) {
-              pingPong.BindFBO(horizontal);
-              gaussianProgram.SetInt("uHorizontal", horizontal);
-              if(first_iteration) {
-                  render.BindTexture(0, 1);
-              } else {
-                  pingPong.BindTexture(0, !horizontal);
-              }
-              screen.Draw(gaussianProgram);
-              gaussianProgram.Bind();
-              horizontal = !horizontal;
-              if(first_iteration) first_iteration = false;
+          glm::mat4 model(1.0f);
+          for (unsigned int i = 0; i < objectPositions.size(); i++) {
+              model = glm::mat4(1.0f);
+              model = translate(model, objectPositions[i]);
+              model = glm::scale(model, glm::vec3(0.5f));
+              program.SetMat4("model", model);
+              backpack.Draw(program, globalSampler);
           }
 
-          // SECOND PASS
+          // LIGHTING PASS
           glBindFramebuffer(GL_FRAMEBUFFER, 0);
           glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
-          glClear(GL_COLOR_BUFFER_BIT);
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
           glDisable(GL_DEPTH_TEST);
           glEnable(GL_FRAMEBUFFER_SRGB);
 
-          float parameter = glm::sin(glm::radians(15.0f * currentTime)) * 0.5 + 0.5;
-          float minExposure = 0.1f;
-          float maxExposure = 1.0f;
-          float exposure = maxExposure * parameter + minExposure * (1.0f - parameter);
-          exposure = 1.0f;
+          deferredProgram.Bind();
+          deferredProgram.SetVec3("viewPosition", cameraData.viewPosition);
+          for (unsigned int i = 0; i < lightPositions.size(); i++) {
+              deferredProgram.SetVec3("lights[" + std::to_string(i) + "].Position", lightPositions[i]);
+              deferredProgram.SetVec3("lights[" + std::to_string(i) + "].Color", lightColors[i]);
 
-          screenProgram.Bind();
+              const float constant = 1.0f;
+              const float linear = 0.7f;
+              const float quadratic = 1.8f;
+              deferredProgram.SetFloat("lights[" + std::to_string(i) + "].Linear", linear);
+              deferredProgram.SetFloat("lights[" + std::to_string(i) + "].Quadratic", quadratic);
+
+              const float maxBrightness = std::fmaxf(std::fmaxf(lightColors[i].r, lightColors[i].g), lightColors[i].b);
+              float radius = (-linear + std::sqrt(linear * linear - 4 * quadratic * (constant - (256.0f/5.0f) * maxBrightness))) / (2.0f * quadratic);
+              deferredProgram.SetFloat("lights[" + std::to_string(i) + "].Radius", radius);
+          }
           glBindSampler(0, 0);
           glBindSampler(1, 0);
-          screenProgram.SetInt("uScreenTexture", 0);
-          screenProgram.SetInt("uBloomBlur", 1);
-          screenProgram.SetFloat("uExposure", exposure);
-          render.BindTexture(0, 0);
-          pingPong.BindTexture(1, !horizontal);
+          glBindSampler(2, 0);
+          gBuffer.BindTexture(0, 0);
+          gBuffer.BindTexture(1, 1);
+          gBuffer.BindTexture(2, 2);
           screen.Bind();
-          screen.Draw(screenProgram);
+          screen.Draw(deferredProgram);
           glBindTextureUnit(0, 0);
           glBindTextureUnit(1, 0);
+          glBindTextureUnit(2, 0);
+
+          glBlitNamedFramebuffer(gBuffer.GetFBO(), 0, 0, 0, currentWidth, currentHeight, 0, 0, currentWidth, currentHeight, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+          // FORWARD RENDERING
+          glEnable(GL_DEPTH_TEST);
+          lightProgram.Bind();
+          for (unsigned int i = 0; i < lightPositions.size(); i++) {
+              model = glm::mat4(1.0f);
+              model = glm::translate(glm::mat4(1.0), lightPositions[i]);
+              model = glm::scale(model, glm::vec3(0.125f));
+              lightProgram.SetMat4("model", model);
+              lightProgram.SetVec3("uAlbedoFlatColor", glm::vec3(1.0,1.0,1.0));
+              lightProgram.SetVec3("uLightColor", lightColors[i]);
+              sphere.Draw(lightProgram);
+          }
 
           glfwSwapBuffers(window);
           glfwPollEvents();
@@ -487,8 +316,7 @@ void ProcessInput(GLFWwindow* window) {
 void FramebufferSizeCallback(GLFWwindow *window, int width, int height) {
     currentWidth = width;
     currentHeight = height;
-    render = DoubleRenderTexture(width, height, true);
-    pingPong = PingPongTextures(currentWidth, currentHeight, true);
+    gBuffer = GBuffer(currentWidth, currentHeight);
     glViewport(0, 0, width, height);
 }
 

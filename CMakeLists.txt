@@ -139,6 +139,8 @@ SET(RENDER_TEXTURE
     "src/Engine/RenderTexture/PingPongTextures.cpp"
     "src/Engine/RenderTexture/DoubleRenderTexture.h"
     "src/Engine/RenderTexture/DoubleRenderTexture.cpp"
+    "src/Engine/RenderTexture/GBuffer.h"
+    "src/Engine/RenderTexture/GBuffer.cpp"
 )
 
 SET(CUBEMAP

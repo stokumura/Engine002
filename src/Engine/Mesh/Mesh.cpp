@@ -94,7 +94,7 @@ void Mesh::Draw(ShaderProgram &shaderProgram) const {
         glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(indices.size()), GL_UNSIGNED_INT, 0);
     }
     Unbind();
-    shaderProgram.Unbind();
+    //shaderProgram.Unbind();
 }
 
 void Mesh::Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const {
@@ -152,7 +152,7 @@ void Mesh::Draw(ShaderProgram &shaderProgram, const Sampler &sampler) const {
         texture->Unbind();
     }
 
-    shaderProgram.Unbind();
+    //shaderProgram.Unbind();
 }
 
 bool Mesh::CreateBuffers(const Mesh *source) {
